@@ -1,0 +1,85 @@
+@page "/expense-reports/create"
+@using ExpenseTracker.Projects
+@using System.IO
+@using ExpenseTracker.ExpenseReports
+@using ExpenseTracker.ExpenseReports.Services
+@using ExpenseTracker.Projects.Dto
+@using ExpenseTracker.Projects.Services
+@inject IExpenseReportAppService ExpenseReportAppService
+@inject IProjectAppService ProjectAppService
+@inject NavigationManager NavigationManager
+<h3>CreateExpenseReport</h3>
+<EditForm Model="createModel" OnValidSubmit="CreateReport">
+    <DataAnnotationsValidator />
+    <Blazorise.ValidationSummary />
+
+    <!-- Başlık -->
+    <div class="mb-3">
+        <label>Başlık</label>
+        <InputText class="form-control" @bind-value="createModel.Title" />
+    </div>
+
+    <!-- Harcama Limiti -->
+    <div class="mb-3">
+        <label>Harcama Limiti (₺)</label>
+        <InputNumber class="form-control" @bind-value="createModel.SpendingLimit" />
+    </div>
+
+    <!-- Proje Seçimi -->
+    <div class="mb-3">
+        <label>Proje Seç</label>
+        <InputSelect class="form-control" @bind-value="createModel.ProjectId">
+            <option value="">Proje Seçin</option>
+            @foreach (var project in projectList)
+            {
+                <option value="@project.Id">@project.Name</option>
+}
+        </InputSelect>
+    </div>
+
+    <!-- Masraf Kalemleri -->
+    @foreach (var item in createModel.Items)
+    {
+        <div class="border p-3 mb-3 rounded">
+            <InputText class="form-control mb-2" placeholder="Açıklama" @bind-value="item.Description" />
+            <InputNumber class="form-control mb-2" placeholder="Tutar ₺" @bind-value="item.Amount" />
+            <InputText class="form-control mb-2" placeholder="Kategori" @bind-value="item.Category" />
+            <InputNumber class="form-control mb-2" placeholder="Çalışma Saati" @bind-value="item.WorkedHours" />
+
+            <!-- Fiş Yükleme -->
+            <InputFile OnChange="e => UploadFile(e, item)" />
+        </div>
+    }
+
+    <button type="submit" class="btn btn-primary mt-3">Kaydet</button>
+</EditForm>
+@code {
+    private CreateExpenseReportDto createModel = new()
+    {
+        Items = new List<CreateExpenseItemDto> { new() }
+    };
+
+    private List<ProjectDto> projectList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        projectList = await ProjectAppService.GetListAsync();
+    }
+
+    private async Task CreateReport()
+    {
+        await ExpenseReportAppService.CreateAsync(createModel);
+        NavigationManager.NavigateTo("/expense-reports");
+    }
+
+    private async Task UploadFile(InputFileChangeEventArgs e, CreateExpenseItemDto item)
+    {
+        var file = e.File;
+        var filePath = Path.Combine("wwwroot", "receipts", file.Name);
+
+        using var stream = File.Create(filePath);
+        await file.OpenReadStream().CopyToAsync(stream);
+
+        item.ReceiptPaths.Add($"/receipts/{file.Name}");
+    }
+}

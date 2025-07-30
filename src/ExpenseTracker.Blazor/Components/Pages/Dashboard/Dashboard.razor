@@ -1,0 +1,63 @@
+@page "/dashboard"
+@using ExpenseTracker.ExpenseReports
+@inject IDashboardAppService DashboardAppService
+
+<h3 class="mb-3">Gösterge Paneli</h3>
+
+@if (dashboard == null)
+{
+    <p>Yükleniyor...</p>
+}
+else
+{
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm p-3">
+                <h5>Bütçe Özeti</h5>
+                <p><strong>Toplam Bütçe:</strong> ₺@dashboard.TotalBudget</p>
+                <p><strong>Faturalanan:</strong> ₺@dashboard.InvoicedAmount</p>
+                <p><strong>Kalan:</strong> ₺@dashboard.RemainingAmount</p>
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm p-3">
+                <h5>Çalışma Süresi</h5>
+                <p><strong>Toplam Saat:</strong> @dashboard.TotalHours saat</p>
+                <p><strong>Çalışılan:</strong> @dashboard.WorkedHours saat</p>
+                <p><strong>Kalan:</strong> @dashboard.RemainingHours saat</p>
+            </div>
+        </div>
+    </div>
+
+    <h5 class="mt-4">Haftalık Durum</h5>
+    <table class="table table-bordered">
+        <thead>
+        <tr>
+            <th>Hafta</th>
+            <th>Gerçekleşen</th>
+            <th>Faturalanan</th>
+            <th>Çalışma Saati</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var item in dashboard.WeeklyData)
+        {
+            <tr>
+                <td>@item.WeekLabel</td>
+                <td>@item.Actual ₺</td>
+                <td>@item.Invoiced ₺</td>
+                <td>@item.WorkedHours saat</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private DashboardDto? dashboard;
+
+    protected override async Task OnInitializedAsync()
+    {
+        dashboard = await DashboardAppService.GetDashboardDataAsync();
+    }
+}
