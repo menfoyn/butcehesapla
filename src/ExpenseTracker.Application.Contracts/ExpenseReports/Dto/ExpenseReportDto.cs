@@ -10,4 +10,5 @@ public class ExpenseReportDto
     public decimal TotalAmount { get; set; }
     public string Status { get; set; }
     public List<ExpenseItemDto> Items { get; set; } = new();
+    public string Title { get; set; }
 }

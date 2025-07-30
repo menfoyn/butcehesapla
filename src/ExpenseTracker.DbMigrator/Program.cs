@@ -32,10 +32,18 @@ class Program
 
     public static IHostBuilder CreateHostBuilder(string[] args) =>
         Host.CreateDefaultBuilder(args)
+            .ConfigureAppConfiguration((hostingContext, config) =>
+            {
+                config.SetBasePath(Path.Combine(Directory.GetCurrentDirectory(), "src", "ExpenseTracker.DbMigrator"));
+                config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            })
             .AddAppSettingsSecretsJson()
             .ConfigureLogging((context, logging) => logging.ClearProviders())
             .ConfigureServices((hostContext, services) =>
             {
                 services.AddHostedService<DbMigratorHostedService>();
             });
+    
+    
+    
 }

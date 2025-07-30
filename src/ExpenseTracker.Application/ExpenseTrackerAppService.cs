@@ -1,17 +1,39 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using ExpenseTracker.Localization;
+using System.Threading.Tasks;
+using ExpenseTracker.ExpenseReports;
+using ExpenseTracker.ExpenseReports.Services;
 using Volo.Abp.Application.Services;
 
-namespace ExpenseTracker;
-
-/* Inherit your application services from this class.
- */
-public abstract class ExpenseTrackerAppService : ApplicationService
+namespace ExpenseTracker.ExpenseReports.Services
 {
-    protected ExpenseTrackerAppService()
+    public class ExpenseReportAppService : ApplicationService, IExpenseReportAppService
     {
-        LocalizationResource = typeof(ExpenseTrackerResource);
+        public async Task<ExpenseReportDto> CreateAsync(CreateExpenseReportDto input)
+        {
+            // Dummy implementation for testing purposes
+            return await Task.FromResult(new ExpenseReportDto
+            {
+                Title = input.Title
+            });
+        }
+
+        public async Task DeleteAsync(Guid id)
+        {
+            // Dummy delete logic
+            await Task.CompletedTask;
+        }
+
+        public async Task<ExpenseReportDto> GetAsync(Guid id)
+        {
+            // Dummy get logic
+            return await Task.FromResult(new ExpenseReportDto { Title = "Sample" });
+        }
+
+        public async Task<List<ExpenseReportDto>> GetListAsync()
+        {
+            // Dummy list logic
+            return await Task.FromResult(new List<ExpenseReportDto>());
+        }
     }
 }

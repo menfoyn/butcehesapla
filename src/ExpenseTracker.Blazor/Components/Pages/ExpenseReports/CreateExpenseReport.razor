@@ -5,53 +5,63 @@
 @using ExpenseTracker.ExpenseReports.Services
 @using ExpenseTracker.Projects.Dto
 @using ExpenseTracker.Projects.Services
+@using Volo.Abp.Validation
 @inject IExpenseReportAppService ExpenseReportAppService
 @inject IProjectAppService ProjectAppService
 @inject NavigationManager NavigationManager
 <h3>CreateExpenseReport</h3>
-<EditForm Model="createModel" OnValidSubmit="CreateReport">
+<EditForm Model="createModel" OnValidSubmit="CreateReport" OnInvalidSubmit="@(() => Console.WriteLine("❌ Form geçersiz"))">
     <DataAnnotationsValidator />
     <Blazorise.ValidationSummary />
 
     <!-- Başlık -->
     <div class="mb-3">
         <label>Başlık</label>
-        <InputText class="form-control" @bind-value="createModel.Title" />
+        <InputText class="form-control" @bind-Value="createModel.Title" />
+        <ValidationMessage For="@(() => createModel.Title)" />
     </div>
 
     <!-- Harcama Limiti -->
     <div class="mb-3">
         <label>Harcama Limiti (₺)</label>
-        <InputNumber class="form-control" @bind-value="createModel.SpendingLimit" />
+        <InputNumber class="form-control" @bind-Value="createModel.SpendingLimit" />
+        <ValidationMessage For="@(() => createModel.SpendingLimit)" />
     </div>
 
     <!-- Proje Seçimi -->
     <div class="mb-3">
         <label>Proje Seç</label>
-        <InputSelect class="form-control" @bind-value="createModel.ProjectId">
+        <InputSelect class="form-control" @bind-Value="createModel.ProjectId">
             <option value="">Proje Seçin</option>
             @foreach (var project in projectList)
             {
                 <option value="@project.Id">@project.Name</option>
-}
+            }
         </InputSelect>
+        <ValidationMessage For="@(() => createModel.ProjectId)" />
     </div>
 
     <!-- Masraf Kalemleri -->
     @foreach (var item in createModel.Items)
     {
         <div class="border p-3 mb-3 rounded">
-            <InputText class="form-control mb-2" placeholder="Açıklama" @bind-value="item.Description" />
-            <InputNumber class="form-control mb-2" placeholder="Tutar ₺" @bind-value="item.Amount" />
-            <InputText class="form-control mb-2" placeholder="Kategori" @bind-value="item.Category" />
-            <InputNumber class="form-control mb-2" placeholder="Çalışma Saati" @bind-value="item.WorkedHours" />
+            <InputText class="form-control mb-2" placeholder="Açıklama" @bind-Value="item.Description" />
+            <ValidationMessage For="@(() => item.Description)" />
+            <InputNumber class="form-control mb-2" placeholder="Tutar ₺" @bind-Value="item.Amount" />
+            <ValidationMessage For="@(() => item.Amount)" />
+            <InputText class="form-control mb-2" placeholder="Kategori" @bind-Value="item.Category" />
+            <ValidationMessage For="@(() => item.Category)" />
+            <InputNumber class="form-control mb-2" placeholder="Çalışma Saati" @bind-Value="item.WorkedHours" />
+            <ValidationMessage For="@(() => item.WorkedHours)" />
 
             <!-- Fiş Yükleme -->
             <InputFile OnChange="e => UploadFile(e, item)" />
         </div>
     }
 
-    <button type="submit" class="btn btn-primary mt-3">Kaydet</button>
+    <button type="submit" class="btn btn-primary mt-3" disabled="@string.IsNullOrEmpty(createModel.ProjectId?.ToString())">Kaydet</button>
+    <button type="button" class="btn btn-info" @onclick='() => Console.WriteLine("🧪 Tıklandı")'>Test</button>
+    <button class="btn btn-warning" @onclick="AddSampleProject">📌 Örnek Proje Ekle</button>
 </EditForm>
 @code {
     private CreateExpenseReportDto createModel = new()
@@ -68,8 +78,29 @@
 
     private async Task CreateReport()
     {
-        await ExpenseReportAppService.CreateAsync(createModel);
-        NavigationManager.NavigateTo("/expense-reports");
+        Console.WriteLine("🟢 CreateReport metodu çalıştı");
+        try
+        {
+            await ExpenseReportAppService.CreateAsync(createModel);
+            NavigationManager.NavigateTo("/expense-reports");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("❗ HATA OLUŞTU: " + ex.Message);
+            Console.WriteLine("🔍 InnerException: " + ex.InnerException?.Message);
+            Console.WriteLine("📌 StackTrace: " + ex.StackTrace);
+            if (ex is AbpValidationException vex)
+            {
+                foreach (var error in vex.ValidationErrors)
+                {
+                    Console.WriteLine($"❌ Validation Error: {error.ErrorMessage}");
+                }
+            }
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine("📌 Inner StackTrace: " + ex.InnerException.StackTrace);
+            }
+        }
     }
 
     private async Task UploadFile(InputFileChangeEventArgs e, CreateExpenseItemDto item)
@@ -80,6 +111,17 @@
         using var stream = File.Create(filePath);
         await file.OpenReadStream().CopyToAsync(stream);
 
+        if (item.ReceiptPaths == null)
+        {
+            item.ReceiptPaths = new List<string>();
+        }
         item.ReceiptPaths.Add($"/receipts/{file.Name}");
+    }
+
+    private async Task AddSampleProject()
+    {
+        await ProjectAppService.CreateSampleProjectAsync();
+        projectList = await ProjectAppService.GetListAsync();
+        Console.WriteLine("📌 Örnek proje eklendi.");
     }
 }

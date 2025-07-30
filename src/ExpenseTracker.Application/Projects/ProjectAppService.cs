@@ -1,12 +1,12 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ExpenseTracker.Projects;
+using ExpenseTracker.Projects.Dto;
+using ExpenseTracker.Projects.Services;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
-using ExpenseTracker.Projects.Dto;
-using ExpenseTracker.Projects;
-using System;
-using ExpenseTracker.Projects.Services;
 
 namespace ExpenseTracker.Projects;
 
@@ -38,6 +38,18 @@ public class ProjectAppService : ApplicationService, IProjectAppService
         };
 
         await _repository.InsertAsync(project);
+        return new ProjectDto
+        {
+            Id = project.Id,
+            Name = project.Name,
+            Description = project.Description
+        };
+    }
+    public async Task<ProjectDto> CreateSampleProjectAsync()
+    {
+        var project = new Project(GuidGenerator.Create(), "Yazılım Geliştirme", "Yazılım projeleri için örnek proje");
+        await _repository.InsertAsync(project, autoSave: true);
+
         return new ProjectDto
         {
             Id = project.Id,
