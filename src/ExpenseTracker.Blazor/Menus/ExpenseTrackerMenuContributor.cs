@@ -42,6 +42,20 @@ public class ExpenseTrackerMenuContributor : IMenuContributor
                 icon: "fas fa-file-invoice-dollar"
             )
         );
+        context.Menu.AddItem(
+            new ApplicationMenuItem(
+                "CreateExpenseReport",
+                "Yeni Masraf Raporu",
+                "/expense-reports/create",
+                icon: "fa fa-plus"
+            )
+        );
+        context.Menu.AddItem(new ApplicationMenuItem(
+            "Dashboard",
+            l["Menu:Dashboard"],
+            "/dashboard",
+            icon: "fas fa-chart-line"
+        ));
 
         if (MultiTenancyConsts.IsEnabled)
         {

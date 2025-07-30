@@ -2,6 +2,8 @@
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
 using Volo.Abp.Data;
+using ExpenseTracker.Projects;
+
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
@@ -55,6 +57,7 @@ public class ExpenseTrackerDbContext :
     public DbSet<ExpenseReport> ExpenseReports { get; set; }
     public DbSet<ExpenseItem> ExpenseItems { get; set; }
     public DbSet<Category> Categories { get; set; }
+    public DbSet<Project> Projects { get; set; }
     public ExpenseTrackerDbContext(DbContextOptions<ExpenseTrackerDbContext> options)
         : base(options)
     {
@@ -83,5 +86,11 @@ public class ExpenseTrackerDbContext :
         //    b.ConfigureByConvention(); //auto configure for the base class props
         //    //...
         //});
+        builder.Entity<Project>(b =>
+        {
+            b.ToTable("AppProjects");
+            b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+            b.Property(x => x.Description).HasMaxLength(500);
+        });
     }
 }

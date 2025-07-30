@@ -72,6 +72,9 @@ namespace ExpenseTracker.Migrations
                     b.Property<string>("ReceiptImagePath")
                         .HasColumnType("text");
 
+                    b.Property<int>("WorkedHours")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("ExpenseReportId");
@@ -129,6 +132,9 @@ namespace ExpenseTracker.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
@@ -139,6 +145,25 @@ namespace ExpenseTracker.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ExpenseReports");
+                });
+
+            modelBuilder.Entity("ExpenseTracker.Projects.Project", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("AppProjects", (string)null);
                 });
 
             modelBuilder.Entity("Volo.Abp.AuditLogging.AuditLog", b =>

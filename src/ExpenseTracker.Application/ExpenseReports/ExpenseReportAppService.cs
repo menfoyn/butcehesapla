@@ -44,7 +44,8 @@ namespace ExpenseTracker.ExpenseReports
             var report = new ExpenseReport
             {
                 OwnerId = input.OwnerId,
-                Status = "Pending"
+                Status = "Pending",
+                ProjectId = input.ProjectId
             };
 
             foreach (var item in input.Items)

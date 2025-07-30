@@ -10,6 +10,8 @@ public class ExpenseReport : FullAuditedAggregateRoot<Guid>
     public Guid OwnerId { get; set; }
     public decimal TotalAmount { get; private set; }
     public string Status { get; set; }
+    public Guid? ProjectId { get; set; }
+    
     
     public ICollection<ExpenseItem> Items { get; set; }
 
