@@ -51,7 +51,16 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        reports = await ExpenseReportAppService.GetListAsync();
+        try
+        {
+            var result = await ExpenseReportAppService.GetListAsync();
+            reports = result ?? new List<ExpenseReportDto>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading reports: {ex.Message}");
+            reports = new List<ExpenseReportDto>();
+        }
     }
 
     private void NavigateToCreate()
@@ -66,7 +75,15 @@ else
 
     private async Task DeleteReport(Guid id)
     {
-        await ExpenseReportAppService.DeleteAsync(id);
-        reports = await ExpenseReportAppService.GetListAsync();
+        try
+        {
+            await ExpenseReportAppService.DeleteAsync(id);
+            var result = await ExpenseReportAppService.GetListAsync();
+            reports = result ?? new List<ExpenseReportDto>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting report: {ex.Message}");
+        }
     }
 }

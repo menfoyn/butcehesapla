@@ -45,6 +45,8 @@
     @foreach (var item in createModel.Items)
     {
         <div class="border p-3 mb-3 rounded">
+            <InputText class="form-control mb-2" placeholder="Masraf Adı" @bind-Value="item.Name" />
+            <ValidationMessage For="@(() => item.Name)" />
             <InputText class="form-control mb-2" placeholder="Açıklama" @bind-Value="item.Description" />
             <ValidationMessage For="@(() => item.Description)" />
             <InputNumber class="form-control mb-2" placeholder="Tutar ₺" @bind-Value="item.Amount" />
@@ -53,13 +55,27 @@
             <ValidationMessage For="@(() => item.Category)" />
             <InputNumber class="form-control mb-2" placeholder="Çalışma Saati" @bind-Value="item.WorkedHours" />
             <ValidationMessage For="@(() => item.WorkedHours)" />
+            <InputText class="form-control mb-2" placeholder="Para Birimi (örneğin: TRY, USD)" @bind-Value="item.Currency" />
+            <ValidationMessage For="@(() => item.Currency)" />
 
             <!-- Fiş Yükleme -->
             <InputFile OnChange="e => UploadFile(e, item)" />
+
+            @if (item.ReceiptPaths != null && item.ReceiptPaths.Any())
+            {
+                <div class="mt-2">
+                    @foreach (var path in item.ReceiptPaths)
+                    {
+                        <div>
+                            <a href="@path" target="_blank">📎 Fişi Görüntüle</a>
+                        </div>
+                    }
+                </div>
+            }
         </div>
     }
 
-    <button type="submit" class="btn btn-primary mt-3" disabled="@string.IsNullOrEmpty(createModel.ProjectId?.ToString())">Kaydet</button>
+    <button type="submit" class="btn btn-primary mt-3" disabled="@string.IsNullOrEmpty(createModel.ProjectId.ToString())">Kaydet</button>
     <button type="button" class="btn btn-info" @onclick='() => Console.WriteLine("🧪 Tıklandı")'>Test</button>
     <button class="btn btn-warning" @onclick="AddSampleProject">📌 Örnek Proje Ekle</button>
 </EditForm>
@@ -81,6 +97,12 @@
         Console.WriteLine("🟢 CreateReport metodu çalıştı");
         try
         {
+            if (createModel.ProjectId == Guid.Empty)
+            {
+                Console.WriteLine("❌ Lütfen bir proje seçiniz.");
+                return;
+            }
+
             await ExpenseReportAppService.CreateAsync(createModel);
             NavigationManager.NavigateTo("/expense-reports");
         }

@@ -11,9 +11,10 @@ public class CreateExpenseReportDto
 
     [Required(ErrorMessage = "Harcama limiti girilmelidir.")]
     public decimal? SpendingLimit { get; set; }
+    public string? ReceiptFilePath { get; set; }
 
     [Required(ErrorMessage = "Bir proje seçilmelidir.")]
-    public Guid? ProjectId { get; set; }
+    public Guid ProjectId { get; set; }
 
     public List<string> ReceiptPaths { get; set; } = new();
 

@@ -25,5 +25,16 @@ namespace ExpenseTracker.ExpenseReports
                 .Where(x => x.OwnerId == ownerId && x.Status == "Pending")
                 .CountAsync();
         }
+
+        public async Task InsertAsync(ExpenseReport report, bool autoSave)
+        {
+            var dbContext = await GetDbContextAsync();
+            await dbContext.ExpenseReports.AddAsync(report);
+
+            if (autoSave)
+            {
+                await dbContext.SaveChangesAsync();
+            }
+        }
     }
 }

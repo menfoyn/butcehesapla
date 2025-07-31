@@ -11,7 +11,9 @@ public class ExpenseItem : Entity<Guid>
     public string Description { get; set; }
     public Guid CategoryId { get; set; }
     public string? ReceiptImagePath { get; set; }
+    public string? ReceiptPath { get; set; }
+
     public int WorkedHours { get; set; }
     public string Currency { get; set; }
-    
+    public string Name { get; set; }
 }

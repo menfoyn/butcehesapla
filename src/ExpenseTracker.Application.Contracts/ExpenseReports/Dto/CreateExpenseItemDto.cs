@@ -15,7 +15,7 @@ public class CreateExpenseItemDto
     public int WorkedHours { get; set; }
     public List<string> ReceiptPaths { get; set; } = new();
 
-    [Required]
     public string Currency { get; set; }
     public string? ReceiptImagePath { get; set; }
+    public string Name { get; set; }
 }
