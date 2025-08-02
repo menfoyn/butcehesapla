@@ -1,5 +1,6 @@
 using Volo.Abp.Domain.Repositories.EntityFrameworkCore;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Volo.Abp.EntityFrameworkCore;
 using ExpenseTracker.EntityFrameworkCore;
@@ -35,6 +36,12 @@ namespace ExpenseTracker.ExpenseReports
             {
                 await dbContext.SaveChangesAsync();
             }
+        }
+
+        public async Task<List<ExpenseReport>> GetListAsync()
+        {
+            var dbContext = await GetDbContextAsync();
+            return await dbContext.ExpenseReports.ToListAsync();
         }
     }
 }

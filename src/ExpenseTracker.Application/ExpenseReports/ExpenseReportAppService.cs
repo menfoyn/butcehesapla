@@ -76,10 +76,24 @@ namespace ExpenseTracker.ExpenseReports
 
             return ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(report);
         }
+
+        public async Task<List<ExpenseReportDto>> GetListAsync()
+        {
+            var reports = await _reportRepository.GetListAsync();
+
+            return reports.Select(report => new ExpenseReportDto
+            {
+                Id = report.Id,
+                Title = report.Title,
+                TotalAmount = report.Items.Sum(i => i.Amount),
+                Status = report.Status
+            }).ToList();
+        }
     }
 
     public interface IReportRepository
     {
         Task InsertAsync(ExpenseReport report, bool autoSave);
+        Task<List<ExpenseReport>> GetListAsync();
     }
 }
