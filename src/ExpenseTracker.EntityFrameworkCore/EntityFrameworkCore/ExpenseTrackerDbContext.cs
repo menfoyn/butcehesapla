@@ -98,7 +98,7 @@ public class ExpenseTrackerDbContext :
         {
             b.ToTable("ExpenseReports");
             b.ConfigureByConvention(); // Includes audit fields like CreatorUserId
-            b.Property(r => r.CreatorUserId).HasColumnName("CreatorUserId");
+            b.Property<object>(r => r.CreatorUserId).HasColumnName("CreatorUserId");
         });
     }
 }

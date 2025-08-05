@@ -1,40 +1,46 @@
 using System;
 using System.Collections.Generic;
+using ExpenseTracker.ExpenseReports;
 using Volo.Abp.Domain.Entities.Auditing;
-
-
-namespace ExpenseTracker.ExpenseReports;
 
 public class ExpenseReport : FullAuditedAggregateRoot<Guid>
 {
-    public Guid OwnerId { get; set; }
-    public decimal TotalAmount { get; private set; }
-    public string Status { get; set; }
-    public Guid? ProjectId { get; set; }
+    public ExpenseReport(Guid projectId, decimal spendingLimit, DateTime createdAt, string? receiptFilePath, Guid? creatorId)
+    {
+        ProjectId = projectId;
+        SpendingLimit = spendingLimit;
+        CreatedAt = createdAt;
+        ReceiptFilePath = receiptFilePath;
+        CreatorId = creatorId;
+    }
+
+    public Guid Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public Guid ProjectId { get; set; }
+    public decimal TotalAmount { get; set; }
+
+    public decimal SpendingLimit { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public string Status { get; set; } = string.Empty;
     public string? ReceiptFilePath { get; set; }
-    public Guid? CreatorUserId { get; set; } 
-    
-    public ICollection<ExpenseItem> Items { get; set; }
+
+    public Guid? CreatorId { get; set; }
+
+    private List<ExpenseItem> _items = new List<ExpenseItem>();
 
     public ExpenseReport()
     {
-        Items = new List<ExpenseItem>();
-    }
-
-    public void AddItem(ExpenseItem item)
-    {
-        Items.Add(item);
-        CalculateTotal();
         
     }
 
-    public void CalculateTotal()
+    public IReadOnlyList<ExpenseItem> Items => _items.AsReadOnly();
+    public Guid OwnerId { get; set; }
+    public Guid CreatorUserId { get; set; }
+
+    public void AddItem(ExpenseItem item)
     {
-        TotalAmount = 0;
-        foreach (var item in Items)
-        {
-            TotalAmount += item.Amount;
-        }
+        _items.Add(item);
     }
-    
+
+   
 }

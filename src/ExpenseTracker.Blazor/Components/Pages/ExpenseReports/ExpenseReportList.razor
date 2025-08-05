@@ -7,11 +7,11 @@
 
 <h3>Masraf Raporları</h3>
 
-@if (reports == null)
+@if (isLoading)
 {
     <p>Yükleniyor...</p>
 }
-else if (!reports.Any())
+else if (reports == null || !reports.Any())
 {
     <p>Hiç masraf raporu bulunamadı.</p>
 }
@@ -20,22 +20,24 @@ else
     <button class="btn btn-primary mb-3" @onclick="NavigateToCreate">
         + Yeni Rapor Ekle
     </button>
-    <table>
+    <table class="table">
         <thead>
-        <tr>
-            <th>Id</th>
-            <th>Toplam Tutar</th>
-            <th>Durum</th>
-            <th></th>
-        </tr>
+            <tr>
+                <th>Id</th>
+                <th>Toplam Tutar</th>
+                <th>Durum</th>
+                <th></th>
+            </tr>
         </thead>
         <tbody>
+        
         @foreach (var report in reports)
         {
             <tr>
                 <td>@report.Id</td>
                 <td>@report.TotalAmount ₺</td>
                 <td>@report.Status</td>
+
                 <td>
                     <button class="btn btn-sm btn-info me-1" @onclick="() => ViewDetails(report.Id)">Detay</button>
                     <button class="btn btn-sm btn-danger" @onclick="() => DeleteReport(report.Id)">Sil</button>
@@ -48,9 +50,16 @@ else
 
 @code {
     private List<ExpenseReportDto> reports;
+    private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadReportsAsync();
+    }
+
+    private async Task LoadReportsAsync()
+    {
+        isLoading = true;
         try
         {
             var result = await ExpenseReportAppService.GetListAsync();
@@ -60,6 +69,10 @@ else
         {
             Console.WriteLine($"Error loading reports: {ex.Message}");
             reports = new List<ExpenseReportDto>();
+        }
+        finally
+        {
+            isLoading = false;
         }
     }
 
@@ -78,8 +91,7 @@ else
         try
         {
             await ExpenseReportAppService.DeleteAsync(id);
-            var result = await ExpenseReportAppService.GetListAsync();
-            reports = result ?? new List<ExpenseReportDto>();
+            await LoadReportsAsync();
         }
         catch (Exception ex)
         {

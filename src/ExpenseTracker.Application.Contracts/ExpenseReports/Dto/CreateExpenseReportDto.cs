@@ -10,7 +10,7 @@ public class CreateExpenseReportDto
     public string Title { get; set; } = String.Empty;
 
     [Required(ErrorMessage = "Harcama limiti girilmelidir.")]
-    public decimal? SpendingLimit { get; set; }
+    public decimal SpendingLimit { get; set; }
     public string? ReceiptFilePath { get; set; }
 
     [Required(ErrorMessage = "Bir proje seçilmelidir.")]

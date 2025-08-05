@@ -63,6 +63,7 @@ public class ExpenseTrackerDomainModule : AbpModule
 
 #if DEBUG
         context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
+        
 #endif
     }
 }

@@ -41,7 +41,15 @@ namespace ExpenseTracker.ExpenseReports
         public async Task<List<ExpenseReport>> GetListAsync()
         {
             var dbContext = await GetDbContextAsync();
-            return await dbContext.ExpenseReports.ToListAsync();
+            return await dbContext.ExpenseReports.Include(x => x.Items).ToListAsync();
+        }
+
+        public async Task<ExpenseReport> GetAsync(Guid id)
+        {
+            var dbContext = await GetDbContextAsync();
+            return await dbContext.ExpenseReports
+                .Include(x => x.Items)
+                .FirstOrDefaultAsync(x => x.Id == id);
         }
     }
 }
