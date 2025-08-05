@@ -1,0 +1,34 @@
+@page "/expense-reports/{Id:guid}"
+@using ExpenseTracker.ExpenseReports
+@using ExpenseTracker.ExpenseReports.Services
+@inject IExpenseReportAppService ExpenseReportAppService
+
+<h3>Masraf Raporu Detayları</h3>
+
+@if (expenseReport == null)
+{
+    <p>Yükleniyor...</p>
+}
+else
+{
+    <div>
+        <p><b>Başlık:</b> @expenseReport.Title</p>
+        <p><b>Toplam Tutar:</b> @ExpenseItem.Amount ₺</p>
+        <p><b>Durum:</b> @expenseReport.Status</p>
+        <p><b>Limit Olması Gereken:</b> @expenseReport.SpendingLimit</p>
+
+        <!-- İstersen diğer alanlar -->
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private ExpenseReportDto expenseReport;
+
+    protected override async Task OnInitializedAsync()
+    {
+        expenseReport = await ExpenseReportAppService.GetAsync(Id);
+    }
+}
