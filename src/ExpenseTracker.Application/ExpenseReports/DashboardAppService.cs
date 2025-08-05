@@ -3,20 +3,31 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Services;
-namespace ExpenseTracker.ExpenseReports;
+using Volo.Abp.Users;
+using ExpenseTracker.Dashboard;
+using ExpenseTracker.ExpenseReports;
+
+namespace ExpenseTracker.Dashboard;
 
 public class DashboardAppService : ApplicationService, IDashboardAppService
 {
     private readonly IExpenseReportRepository _expenseReportRepository;
+    private readonly ICurrentUser _currentUser;
 
-    public DashboardAppService(IExpenseReportRepository expenseReportRepository)
+    public DashboardAppService(IExpenseReportRepository expenseReportRepository, ICurrentUser currentUser)
     {
         _expenseReportRepository = expenseReportRepository;
+        _currentUser = currentUser;
     }
 
     public async Task<DashboardDto> GetDashboardDataAsync()
     {
         var reports = await _expenseReportRepository.GetListAsync();
+
+        if (!_currentUser.IsInRole("Admin"))
+        {
+            reports = reports.Where(r => r.CreatorId == _currentUser.Id).ToList();
+        }
 
         var totalBudget = reports.Sum(r => r.TotalAmount);
         var invoicedAmount = reports.Where(r => r.Status == "Invoiced").Sum(r => r.TotalAmount);
@@ -47,4 +58,4 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             WeeklyData = weeklyData
         };
     }
-} 
+}

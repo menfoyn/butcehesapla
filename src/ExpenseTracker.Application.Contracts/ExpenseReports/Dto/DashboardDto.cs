@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace ExpenseTracker.ExpenseReports;
+namespace ExpenseTracker.Dashboard;
 
 public class DashboardDto
 {

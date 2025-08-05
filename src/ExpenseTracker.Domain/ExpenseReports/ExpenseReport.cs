@@ -12,6 +12,7 @@ public class ExpenseReport : FullAuditedAggregateRoot<Guid>
     public string Status { get; set; }
     public Guid? ProjectId { get; set; }
     public string? ReceiptFilePath { get; set; }
+    public Guid? CreatorUserId { get; set; } 
     
     public ICollection<ExpenseItem> Items { get; set; }
 

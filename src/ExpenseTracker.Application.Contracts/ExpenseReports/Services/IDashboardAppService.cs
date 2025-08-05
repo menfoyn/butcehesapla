@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
+using ExpenseTracker.Dashboard;
 
-namespace ExpenseTracker.ExpenseReports;
+namespace ExpenseTracker.Dashboard;
 
 public interface IDashboardAppService
 {

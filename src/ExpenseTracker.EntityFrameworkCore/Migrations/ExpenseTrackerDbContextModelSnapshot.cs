@@ -69,7 +69,14 @@ namespace ExpenseTracker.Migrations
                     b.Property<Guid>("ExpenseReportId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("ReceiptImagePath")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReceiptPath")
                         .HasColumnType("text");
 
                     b.Property<int>("WorkedHours")
@@ -101,6 +108,10 @@ namespace ExpenseTracker.Migrations
                     b.Property<Guid?>("CreatorId")
                         .HasColumnType("uuid")
                         .HasColumnName("CreatorId");
+
+                    b.Property<Guid?>("CreatorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("CreatorUserId");
 
                     b.Property<Guid?>("DeleterId")
                         .HasColumnType("uuid")
@@ -147,7 +158,7 @@ namespace ExpenseTracker.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ExpenseReports");
+                    b.ToTable("ExpenseReports", (string)null);
                 });
 
             modelBuilder.Entity("ExpenseTracker.Projects.Project", b =>

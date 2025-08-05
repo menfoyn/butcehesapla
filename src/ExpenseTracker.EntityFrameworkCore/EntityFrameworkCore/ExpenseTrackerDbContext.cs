@@ -15,6 +15,8 @@ using Volo.Abp.SettingManagement.EntityFrameworkCore;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
 using ExpenseTracker.ExpenseReports;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+
 namespace ExpenseTracker.EntityFrameworkCore;
 
 [ReplaceDbContext(typeof(IIdentityDbContext))]
@@ -91,6 +93,12 @@ public class ExpenseTrackerDbContext :
             b.ToTable("AppProjects");
             b.Property(x => x.Name).IsRequired().HasMaxLength(128);
             b.Property(x => x.Description).HasMaxLength(500);
+        });
+        builder.Entity<ExpenseReport>(b =>
+        {
+            b.ToTable("ExpenseReports");
+            b.ConfigureByConvention(); // Includes audit fields like CreatorUserId
+            b.Property(r => r.CreatorUserId).HasColumnName("CreatorUserId");
         });
     }
 }

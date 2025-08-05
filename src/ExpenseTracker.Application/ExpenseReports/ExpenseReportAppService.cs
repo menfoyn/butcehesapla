@@ -3,18 +3,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Volo.Abp.ObjectMapping;
+using Volo.Abp.Application.Services;
+using Volo.Abp.Domain.Entities;
+using Volo.Abp.Users;
+using Volo.Abp.Domain.Entities.Auditing;
 
 namespace ExpenseTracker.ExpenseReports
 {
-    public class ExpenseReport
+    public class ExpenseReport : IHasCreator<Guid>
     {
         public Guid Id { get; set; }
-        public string Title { get; set; }
+        public string Title { get; set; } = string.Empty;
         public Guid ProjectId { get; set; }
         public decimal SpendingLimit { get; set; }
         public DateTime CreatedAt { get; set; }
-        public string Status { get; set; }
+        public string Status { get; set; } = string.Empty;
         public string? ReceiptFilePath { get; set; }
+
+        public Guid? CreatorId { get; set; }
 
         private List<ExpenseItem> _items = new List<ExpenseItem>();
         public IReadOnlyList<ExpenseItem> Items => _items.AsReadOnly();
@@ -25,15 +31,24 @@ namespace ExpenseTracker.ExpenseReports
         }
     }
 
-    public class ExpenseReportAppService
+    public interface IHasCreator<T>
+    {
+    }
+
+    public class ExpenseReportAppService : ApplicationService
     {
         private readonly IReportRepository _reportRepository;
         private readonly IObjectMapper ObjectMapper;
+        private readonly ICurrentUser _currentUser;
 
-        public ExpenseReportAppService(IReportRepository reportRepository, IObjectMapper objectMapper)
+        public ExpenseReportAppService(
+            IReportRepository reportRepository,
+            IObjectMapper objectMapper,
+            ICurrentUser currentUser)
         {
             _reportRepository = reportRepository;
             ObjectMapper = objectMapper;
+            _currentUser = currentUser;
         }
 
         public async Task<ExpenseReportDto> CreateAsync(CreateExpenseReportDto input)
@@ -64,7 +79,8 @@ namespace ExpenseTracker.ExpenseReports
                 SpendingLimit = input.SpendingLimit ?? 0,
                 CreatedAt = DateTime.Now,
                 Status = "Taslak",
-                ReceiptFilePath = input.Items?.FirstOrDefault()?.ReceiptPaths?.FirstOrDefault() ?? string.Empty
+                ReceiptFilePath = input.Items?.FirstOrDefault()?.ReceiptPaths?.FirstOrDefault() ?? string.Empty,
+                CreatorId = _currentUser.Id,
             };
 
             foreach (var item in items)
@@ -80,6 +96,12 @@ namespace ExpenseTracker.ExpenseReports
         public async Task<List<ExpenseReportDto>> GetListAsync()
         {
             var reports = await _reportRepository.GetListAsync();
+
+            // SADECE kendi oluşturduğu raporları görsün
+            if (!_currentUser.Roles.Contains("Admin"))
+            {
+                reports = reports.Where(r => r.CreatorId == _currentUser.Id).ToList();
+            }
 
             return reports.Select(report => new ExpenseReportDto
             {
