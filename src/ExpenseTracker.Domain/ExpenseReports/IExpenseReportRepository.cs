@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Volo.Abp.Domain.Repositories;
 
@@ -10,6 +11,5 @@ public interface IExpenseReportRepository : IRepository<ExpenseReport, Guid>
 
 {
     Task<int> GetPendingReportsCountAsync(Guid ownerId);
-    Task InsertAsync(ExpenseReport report, bool autoSave = false);
-    
+    Task<ExpenseReport> GetAsync(Guid ownerId);
 }

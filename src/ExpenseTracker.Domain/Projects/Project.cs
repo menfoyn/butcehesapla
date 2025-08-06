@@ -13,7 +13,7 @@ public class Project : Entity<Guid>
 
     public Project(Guid id, string name, string description)
     {
-        Id = id;
+        Id = id;    
         Name = name;
         Description = description;
     }

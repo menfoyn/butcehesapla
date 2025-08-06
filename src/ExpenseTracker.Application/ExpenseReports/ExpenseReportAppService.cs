@@ -30,7 +30,7 @@ namespace ExpenseTracker.ExpenseReports.Services
             {
                 Title = input.Title,
                 Status = "Pending"  // İstersen burada varsayılan durum ver
-            };
+            };  
 
             await _expenseReportRepository.InsertAsync(expenseReport, autoSave: true);
 

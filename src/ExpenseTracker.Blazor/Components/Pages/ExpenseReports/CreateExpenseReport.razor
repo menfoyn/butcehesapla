@@ -51,7 +51,13 @@
             <ValidationMessage For="@(() => item.Description)" />
             <InputNumber class="form-control mb-2" placeholder="Tutar ₺" @bind-Value="item.Amount" />
             <ValidationMessage For="@(() => item.Amount)" />
-            <InputText class="form-control mb-2" placeholder="Kategori" @bind-Value="item.Category" />
+            <InputSelect class="form-control mb-2" @bind-Value="item.Category">
+                <option value="">Kategori Seçin</option>
+                @foreach (var category in categoryList)
+                {
+                    <option value="@category">@category</option>
+                }
+            </InputSelect>
             <ValidationMessage For="@(() => item.Category)" />
             <InputNumber class="form-control mb-2" placeholder="Çalışma Saati" @bind-Value="item.WorkedHours" />
             <ValidationMessage For="@(() => item.WorkedHours)" />
@@ -80,6 +86,11 @@
     <button class="btn btn-warning" @onclick="AddSampleProject">📌 Örnek Proje Ekle</button>
 </EditForm>
 @code {
+    private List<string> categoryList = new()
+    {
+        "Ulaşım", "Konaklama", "Yemek", "Ofis", "Ekipman", "Yolculuk", "Diğer"
+    };
+
     private CreateExpenseReportDto createModel = new()
     {
         Items = new List<CreateExpenseItemDto> { new() }
