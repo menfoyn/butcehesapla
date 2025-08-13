@@ -1,7 +1,12 @@
 @page "/dashboard"
+@using System.Text.Json
 @using ExpenseTracker.Dashboard
 @using ExpenseTracker.ExpenseReports
+@using System.Linq
 @inject IDashboardAppService DashboardAppService
+@inject IJSRuntime JS
+
+<!-- Dashboard page: shows summary cards, a weekly chart, and a fallback table -->
 
 <h3 class="mb-3">Gösterge Paneli</h3>
 
@@ -30,35 +35,180 @@ else
         </div>
     </div>
 
-    <h5 class="mt-4">Haftalık Durum</h5>
-    <table class="table table-bordered">
-        <thead>
-        <tr>
-            <th>Hafta</th>
-            <th>Gerçekleşen</th>
-            <th>Faturalanan</th>
-            <th>Çalışma Saati</th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach (var item in dashboard.WeeklyData)
+    <h5 class="mt-4">Projeler</h5>
+    <div class="row row-cols-1 row-cols-md-3 g-3">
+        @foreach (var p in dashboard.ProjectSummaries)
         {
-            <tr>
-                <td>@item.WeekLabel</td>
-                <td>@item.Actual ₺</td>
-                <td>@item.Invoiced ₺</td>
-                <td>@item.WorkedHours saat</td>
-            </tr>
+            <div class="col">
+                <div class="card shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="card-title mb-2">@p.ProjectName</h6>
+                            <span class="badge bg-secondary">@p.ProjectId.ToString()[..8]</span>
+                        </div>
+                        <div class="small text-muted mb-2">Bütçe: ₺@p.Budget</div>
+                        <div class="mb-2"><strong>Faturalanan:</strong> ₺@p.InvoicedAmount</div>
+                        <div class="progress mb-2" style="height:8px;">
+                            <div class="progress-bar" role="progressbar"
+                                 style="width:@(p.Budget > 0 ? Math.Min(100, (int)(p.InvoicedAmount * 100 / p.Budget)) : 0)%"></div>
+                        </div>
+                        <div class="small">Kalan: ₺@p.RemainingAmount</div>
+                        <div class="mt-3">
+                            <div class="small text-muted mb-1">Haftalık Harcama</div>
+                            <canvas id="@($"pc-{p.ProjectId:N}")" height="90"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
         }
-        </tbody>
-    </table>
+    </div>
+
+    <h5 class="mt-4">Haftalık Durum</h5>
+
+    <div class="card shadow-sm mb-3">
+        <div class="card-body">
+            <canvas id="weeklyChart" height="120"></canvas>
+        </div>
+    </div>
+
+    <details class="mb-4">
+        <summary>Tabloyu göster (yedek)</summary>
+        <table class="table table-bordered mt-3">
+            <thead>
+            <tr>
+                <th>Hafta</th>
+                <th>Gerçekleşen</th>
+                <th>Faturalanan</th>
+                <th>Çalışma Saati</th>
+            </tr>
+            </thead>
+            <tbody>
+                @{
+                    var hasWeekly = (dashboard?.WeeklyData?.Count ?? 0) > 0;
+
+                    // Determine how many points we can safely build from the series
+                    var count = new[]
+                    {
+                        dashboard?.WeekLabels?.Count ?? 0,
+                        dashboard?.ActualSeries?.Count ?? 0,
+                        dashboard?.InvoicedSeries?.Count ?? 0
+                    }.Min();
+
+                    var rows = hasWeekly
+                        ? dashboard!.WeeklyData!
+                        : (count > 0
+                            ? Enumerable.Range(0, count)
+                                .Select(i => new WeeklyChartDataDto
+                                {
+                                    WeekLabel = dashboard!.WeekLabels![i],
+                                    Actual     = dashboard!.ActualSeries![i],
+                                    Invoiced   = dashboard!.InvoicedSeries![i],
+                                    WorkedHours = (dashboard!.WorkedHoursSeries != null && dashboard!.WorkedHoursSeries.Count > i)
+                                        ? dashboard.WorkedHoursSeries[i]
+                                        : 0
+                                })
+                                .ToList()
+                            : new List<WeeklyChartDataDto>());
+                }
+
+                @if (rows.Count > 0)
+                {
+                    foreach (var item in rows)
+                    {
+                        <tr>
+                            <td>@item.WeekLabel</td>
+                            <td>@item.Actual ₺</td>
+                            <td>@item.Invoiced ₺</td>
+                            <td>@item.WorkedHours saat</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="4" class="text-muted">Haftalık veri bulunamadı.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </details>
 }
+
+<!-- Chart.js (provided by LeptonX theme assets). If the path changes in your theme, update below. -->
+<script src="/_content/Volo.Abp.AspNetCore.Components.Web.LeptonXLiteTheme/side-menu/libs/chart.js/Chart.min.js"></script>
+<script>
+    window.renderWeeklyChart = function (labels, actual, invoiced) {
+        const ctx = document.getElementById('weeklyChart');
+        if (!ctx || !window.Chart) return;
+        // dispose previous instance if any
+        if (ctx._chart) { ctx._chart.destroy(); }
+        const data = {
+            labels: labels,
+            datasets: [
+                { label: 'Gerçekleşen', data: actual, fill: false, tension: 0.3 },
+                { label: 'Faturalanan', data: invoiced, fill: false, tension: 0.3 }
+            ]
+        };
+        const cfg = { type: 'line', data: data, options: { responsive: true, plugins: { legend: { position: 'top' } } } };
+        ctx._chart = new Chart(ctx, cfg);
+    }
+
+    window.renderProjectCharts = function (items) {
+        if (!Array.isArray(items)) return;
+        items.forEach(it => {
+            const ctx = document.getElementById(it.id);
+            if (!ctx || !window.Chart) return;
+            if (ctx._chart) { ctx._chart.destroy(); }
+            const data = {
+                labels: it.labels,
+                datasets: [
+                    { label: 'Harcanan', data: it.actual, fill: false, tension: 0.3 }
+                ]
+            };
+            const cfg = { type: 'line', data: data, options: { responsive: true, plugins: { legend: { display: false } } } };
+            ctx._chart = new Chart(ctx, cfg);
+        });
+    }
+</script>
 
 @code {
     private DashboardDto? dashboard;
+    private bool _chartRendered;
 
     protected override async Task OnInitializedAsync()
     {
         dashboard = await DashboardAppService.GetDashboardDataAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (dashboard is null) return;
+        if (!_chartRendered)
+        {
+            var labels   = dashboard.WeekLabels ?? new List<string>();
+            var actual   = dashboard.ActualSeries ?? new List<decimal>();
+            var invoiced = dashboard.InvoicedSeries ?? new List<decimal>();
+
+            await JS.InvokeVoidAsync(
+                "renderWeeklyChart",
+                labels.ToArray(),
+                actual.ToArray(),
+                invoiced.ToArray()
+            );
+
+            // prepare per‑project mini charts (id, labels, actual)
+            var projectCharts = (dashboard.WeeklyDataByProject ?? new Dictionary<Guid, List<WeeklyChartDataDto>>())
+                .Select(kvp => new
+                {
+                    id = $"pc-{kvp.Key:N}",
+                    labels = (kvp.Value ?? new List<WeeklyChartDataDto>()).Select(v => v.WeekLabel).ToArray(),
+                    actual = (kvp.Value ?? new List<WeeklyChartDataDto>()).Select(v => v.Actual).ToArray()
+                })
+                .ToList();
+
+            await JS.InvokeVoidAsync("renderProjectCharts", projectCharts);
+
+            _chartRendered = true;
+        }
     }
 }

@@ -1,56 +1,66 @@
 @page "/expense-reports"
+@using System.Globalization
 @using ExpenseTracker.ExpenseReports
 @using ExpenseTracker.ExpenseReports.Services
 @inject IExpenseReportAppService ExpenseReportAppService
 @inject NavigationManager NavigationManager
 @using System.Linq
 
-<h3>Masraf Raporları</h3>
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h3 class="mb-0">Masraf Raporları</h3>
+    <button class="btn btn-primary" @onclick="NavigateToCreate">
+        + Yeni Rapor Ekle
+    </button>
+</div>
 
 @if (isLoading)
 {
-    <p>Yükleniyor...</p>
+    <div class="text-muted">Yükleniyor...</div>
 }
 else if (reports == null || !reports.Any())
 {
-    <p>Hiç masraf raporu bulunamadı.</p>
+    <div class="alert alert-light border">Hiç masraf raporu bulunamadı.</div>
 }
 else
 {
-    <button class="btn btn-primary mb-3" @onclick="NavigateToCreate">
-        + Yeni Rapor Ekle
-    </button>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Id</th>
-                <th>Toplam Tutar</th>
-                <th>Durum</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-        
-        @foreach (var report in reports)
-        {
-            <tr>
-                <td>@report.Id</td>
-                <td>@report.TotalAmount ₺</td>
-                <td>@report.Status</td>
-
-                <td>
-                    <button class="btn btn-sm btn-info me-1" @onclick="() => ViewDetails(report.Id)">Detay</button>
-                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteReport(report.Id)">Sil</button>
-                </td>
-            </tr>
-        }
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th style="min-width: 280px;">Kategori / Başlık</th>
+                    <th style="width: 140px;" class="text-end">Toplam</th>
+                    <th style="width: 120px;">Durum</th>
+                    <th style="width: 160px;" class="text-end">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var report in reports)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@DisplayProject(report)</div>
+                        <div class="text-muted small">@(!string.IsNullOrWhiteSpace(report.Title) ? report.Title : "(Başlıksız)")</div>
+                    </td>
+                    <td class="text-end">@Currency(report.TotalAmount, null)</td>
+                    <td>
+                        <span class="badge @StatusBadge(report.Status)">@report.Status</span>
+                    </td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ViewDetails(report.Id)">Detay</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteReport(report.Id)">Sil</button>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
-    private List<ExpenseReportDto> reports;
+    private List<ExpenseReportDto> reports = new();
     private bool isLoading = true;
+    // ReportId -> Resolved display label (Category or ProjectName)
+    private readonly Dictionary<Guid, string> _displayNameById = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -64,11 +74,16 @@ else
         {
             var result = await ExpenseReportAppService.GetListAsync();
             reports = result ?? new List<ExpenseReportDto>();
+
+            // Items çoğu list DTO'da gelmediği için kategori/proje adını
+            // detay servisi üzerinden önceden çözüyoruz.
+            await PreloadDisplayNamesAsync();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading reports: {ex.Message}");
             reports = new List<ExpenseReportDto>();
+            _displayNameById.Clear();
         }
         finally
         {
@@ -76,15 +91,41 @@ else
         }
     }
 
-    private void NavigateToCreate()
+    private async Task PreloadDisplayNamesAsync()
     {
-        NavigationManager.NavigateTo("/expense-reports/create");
+        _displayNameById.Clear();
+
+        foreach (var r in reports)
+        {
+            try
+            {
+                // Detay çağrısı: Items ve ProjectName kesin gelir
+                var full = await ExpenseReportAppService.GetAsync(r.Id);
+
+                var category = full?.Items?.FirstOrDefault()?.Category;
+                string? name = null;
+
+                if (!string.IsNullOrWhiteSpace(category))
+                {
+                    name = category!.ToUpperInvariant();
+                }
+                else if (!string.IsNullOrWhiteSpace(full?.ProjectName))
+                {
+                    name = full!.ProjectName!.ToUpperInvariant();
+                }
+
+                _displayNameById[r.Id] = name ?? "(KATEGORİ / PROJE YOK)";
+            }
+            catch
+            {
+                _displayNameById[r.Id] = "(KATEGORİ / PROJE YOK)";
+            }
+        }
     }
 
-    private void ViewDetails(Guid id)
-    {
-        NavigationManager.NavigateTo($"/expense-reports/{id}");
-    }
+    private void NavigateToCreate() => NavigationManager.NavigateTo("/expense-reports/create");
+
+    private void ViewDetails(Guid id) => NavigationManager.NavigateTo($"/expense-reports/{id}");
 
     private async Task DeleteReport(Guid id)
     {
@@ -97,5 +138,49 @@ else
         {
             Console.WriteLine($"Error deleting report: {ex.Message}");
         }
+    }
+
+    // --- UI helpers ---
+    private string DisplayProject(ExpenseReportDto r)
+    {
+        if (r != null && _displayNameById.TryGetValue(r.Id, out var cached) && !string.IsNullOrWhiteSpace(cached))
+            return cached;
+
+        // Fallback (list DTO'su Items getirmiyorsa çoğunlukla boş kalır)
+        var category = r?.Items?.FirstOrDefault()?.Category;
+        if (!string.IsNullOrWhiteSpace(category))
+            return category!.ToUpperInvariant();
+
+        if (!string.IsNullOrWhiteSpace(r?.ProjectName))
+            return r!.ProjectName!.ToUpperInvariant();
+
+        return "(KATEGORİ / PROJE YOK)";
+    }
+
+    private static string StatusBadge(string? status)
+    {
+        return status?.ToLowerInvariant() switch
+        {
+            "approved" => "bg-success",
+            "completed" => "bg-success",
+            "invoiced" => "bg-info",
+            "rejected" => "bg-danger",
+            "pending" => "bg-warning text-dark",
+            _ => "bg-secondary"
+        };
+    }
+
+    private static string Currency(decimal amount, string? currencyCode)
+    {
+        currencyCode = string.IsNullOrWhiteSpace(currencyCode) ? "TRY" : currencyCode.ToUpperInvariant();
+        var symbol = currencyCode switch
+        {
+            "TRY" => "₺",
+            "USD" => "$",
+            "EUR" => "€",
+            "GBP" => "£",
+            _ => currencyCode + " "
+        };
+        return string.Format(CultureInfo.GetCultureInfo("tr-TR"), "{0:N2} {1}", amount, symbol);
     }
 }

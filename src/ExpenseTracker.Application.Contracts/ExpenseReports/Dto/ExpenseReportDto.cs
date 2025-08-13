@@ -14,4 +14,6 @@ public class ExpenseReportDto
     public string Status { get; set; }
     public string Title { get; set; }
     public List<ExpenseItemDto> Items { get; set; } = new();
+    public string? ReceiptFilePath { get; set; }
+    public string? ProjectName { get; set; }
 }

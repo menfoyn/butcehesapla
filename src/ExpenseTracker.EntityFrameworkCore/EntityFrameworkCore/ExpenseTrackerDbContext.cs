@@ -94,11 +94,46 @@ public class ExpenseTrackerDbContext :
             b.Property(x => x.Name).IsRequired().HasMaxLength(128);
             b.Property(x => x.Description).HasMaxLength(500);
         });
+
         builder.Entity<ExpenseReport>(b =>
         {
             b.ToTable("ExpenseReports");
-            b.ConfigureByConvention(); // Includes audit fields like CreatorUserId
-            b.Property<object>(r => r.CreatorUserId).HasColumnName("CreatorUserId");
+            b.ConfigureByConvention(); // Includes audit fields like CreatorId
+
+            b.Property(x => x.Title).IsRequired().HasMaxLength(256);
+            b.Property(x => x.Status).HasMaxLength(64);
+            b.Property(x => x.SpendingLimit).HasColumnType("decimal(18,2)");
+            b.Property(x => x.TotalAmount).HasColumnType("decimal(18,2)");
+
+            b.HasMany(e => e.Items)
+                .WithOne()
+                .HasForeignKey(i => i.ExpenseReportId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Make EF access the collection via the backing field (e.g., _items)
+            b.Navigation(e => e.Items)
+                .UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        builder.Entity<ExpenseItem>(b =>
+        {
+            b.ToTable("ExpenseItems");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            b.Property(x => x.Currency).HasMaxLength(8);
+            b.Property(x => x.Name).HasMaxLength(128);
+            b.Property(x => x.Description).HasMaxLength(1024);
+        });
+
+        builder.Entity<Category>(b =>
+        {
+            b.ToTable("Categories");
+            b.ConfigureByConvention();
+
+            b.Property(x => x.Name).IsRequired().HasMaxLength(128);
+            b.Property(x => x.SpendingLimit).HasColumnType("decimal(18,2)");
         });
     }
 }

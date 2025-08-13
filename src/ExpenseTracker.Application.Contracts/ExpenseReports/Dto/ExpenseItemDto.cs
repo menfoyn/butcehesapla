@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ExpenseTracker.ExpenseReports;
 
@@ -11,5 +12,9 @@ public partial class ExpenseItemDto
     public Guid CategoryId { get; set; }
     public string Currency { get; set; }
     public string? ReceiptImagePath { get; set; } = string.Empty;
-    
+    public IEnumerable<object> ReceiptPaths { get; set; }
+    public string? ReceiptFilePath { get; set; }
+    public string? ReceiptUrl { get; set; }
+    public Dictionary<string, object> ExtraProperties { get; set; } = new();
+    public string? Category { get; set; }
 }

@@ -1,100 +1,156 @@
 @page "/"
-@using Volo.Abp.MultiTenancy
-@inherits ExpenseTrackerComponentBase
-@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.Components.Web
 
-<div class="row mb-3">
-    <div class="col-xl-6 col-12 d-flex">
-        <div class="card h-lg-100 w-100 overflow-hidden">
-            <div class="card-body">
-                <div class="starting-content">
-                    <h3>Getting Started</h3>
-                    <p class="lead text-muted mb-2">Learn how to create and run a new web application using the application startup template.</p>
-                    <a href="https://docs.abp.io/en/commercial/latest/getting-started" class="btn btn-brand mb-4" target="_blank">Getting Started</a>
+<style>
+  /* Basit ve uyarısız CSS (Razor  karakterini gerektiren hiçbir kural yok) */
+  .hero {
+    position: relative;
+    border-radius: 20px;
+    padding: 64px 28px 56px;
+    margin: 28px auto 40px;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(99,102,241,.35), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(16,185,129,.25), transparent 60%),
+      linear-gradient(180deg, #0b1220, #0f172a);
+    color: #f8fafc;
+    overflow: hidden;
+  }
 
-                    <h4>Web Application Development Tutorial</h4>
-                    <p class="text-muted mb-2">Learn how to build an ABP based web application named Acme.BookStore.</p>
-                    <a href="https://docs.abp.io/en/commercial/latest/tutorials/book-store/part-1?UI=MVC&DB=EF" class="btn btn-primary soft mb-4" target="_blank">Explore Tutorial</a>
+  .hero .logo {
+    width: 150px;
+    height: auto;
+    filter: drop-shadow(0 8px 18px rgba(0,0,0,.35));
+  }
+  .hero h1 {
+    font-weight: 800;
+    letter-spacing: .3px;
+    margin-top: 16px;
+    margin-bottom: 10px;
+    line-height: 1.15;
+    background: linear-gradient(90deg, #ffffff, #dbeafe 45%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero p.lead {
+    color: #e2e8f0;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .hero-cta .btn {
+    padding: 11px 18px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  .btn-brand {
+    background: linear-gradient(90deg, #6366f1, #22c55e);
+    color: #fff;
+    border: none;
+    box-shadow: 0 10px 24px rgba(34,197,94,.28), 0 8px 18px rgba(99,102,241,.22);
+    transform: translateZ(0);
+    transition: transform .14s ease, box-shadow .14s ease, filter .14s ease;
+  }
+  .btn-brand:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(34,197,94,.35), 0 10px 22px rgba(99,102,241,.30);
+    filter: brightness(1.05);
+  }
+  .btn-ghost {
+    border: 1px solid rgba(255,255,255,.5);
+    color: #fff;
+    background: rgba(255,255,255,.06);
+    backdrop-filter: blur(6px);
+    transition: transform .14s ease, background .14s ease, border-color .14s ease;
+  }
+  .btn-ghost:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,.10);
+    border-color: rgba(255,255,255,.65);
+  }
 
-                    <h4>Customize Lepton Theme</h4>
-                    <p class="text-muted mb-2">Learn how to customize LeptonX Theme as you wish.</p>
-                    <a href="https://docs.abp.io/en/commercial/latest/themes/lepton/customizing-lepton-theme" class="btn btn-primary soft mb-5 mb-xl-0" target="_blank">Customize Lepton</a>
-                </div>
-                <img class="card-bg-image" src="/images/getting-started/bg-01.png">
-            </div>
-        </div>
-    </div>
+  .quick-grid { margin-top: 10px; }
+  .hover-card {
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.66));
+    backdrop-filter: blur(6px);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    box-shadow: 0 12px 28px rgba(2, 6, 23, .10);
+  }
+  .hover-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 36px rgba(2, 6, 23, .16);
+    border-color: rgba(99,102,241,.35);
+  }
 
-    <div class="col-xl-3 col-md-6 d-flex">
-        <div class="card h-100 overflow-hidden">
-            <div class="card-body">
-                <div class="abp-support abp-logo mb-2"></div>
-                <p class="text-muted mb-2">You can check for similar problems and solutions, or open a new topic to discuss your specific issue.</p>
-                <a href="https://support.abp.io/QA/Questions" class="btn btn-brand soft" target="_blank">Visit Support</a>
-                <img class="" src="/images/getting-started/img-support.png">
-            </div>
-        </div>
-    </div>
+  .tile-icon {
+    display: inline-flex;
+    width: 42px; height: 42px;
+    align-items: center; justify-content: center;
+    font-size: 22px;
+    border-radius: 12px;
+    background: #f1f5f9;
+  }
+  .card-title { font-weight: 700; letter-spacing: .2px; }
+  .stretched-link { text-decoration: none; }
 
-    <div class="col-xl-3 col-md-6 d-flex">
-        <div class="card h-100 overflow-hidden">
-            <div class="card-body">
-                <div class="abp-community abp-logo mb-2"></div>
-                <p class="lead text-muted">A unique community platform for <span class="fw-bold">ABP Lovers!</span></p>
-                <p class="text-muted mb-2">Explore all ABP users' experiences with the ABP Framework, discover articles and videos on how to use ABP, and join raffles for a chance to win surprise gifts!</p>
-                <a class="btn btn-brand soft mb-3" href="https://community.abp.io/" target="_blank">Join ABP Community</a>
-            </div>
-            <img class="mt-3" src="/images/getting-started/img-community.png">
-        </div>
-    </div>
-</div>
+  .badge-strip {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;
+    justify-content: center;
+  }
+  .pill {
+    font-size: .78rem; padding: 5px 12px; border-radius: 999px;
+    border: 1px solid rgba(226,232,240,.75);
+    color: #475569; background: rgba(248,250,252,.9);
+  }
 
-<div class="my-3 text-center">
-    <h3>Let's improve your application!</h3>
-    <p>Here are some links to help you get started:</p>
-</div>
+  .quick-actions { margin-top: 18px; }
+  .qa {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 999px;
+    border: 1px dashed rgba(148,163,184,.55);
+    color: #94a3b8; background: rgba(241,245,249,.8);
+    transition: transform .15s ease;
+    cursor: pointer;
+  }
+  .qa:hover { transform: translateY(-2px); background: rgba(241,245,249,.95); }
+</style>
 
-<div class="card mt-4 mb-5">
-    <div class="card-body">
-        <div class="row text-center justify-content-md-center">
-            <div class="col-lg-4">
-                <div class="p-4">
-                    <h5 class="mb-3"><i class="fas fa-book text-secondary d-block my-3 fa-2x"></i> Learn the ABP Framework</h5>
-                    <p>Explore the comprehensive documentation to learn how to build a modern web application.</p>
-                    <a href="https://abp.io/docs/latest?ref=tmpl" target="_blank" class="btn btn-link px-1">See Documents <i class="fas fa-chevron-right"></i></a>
-                </div>
-            </div>
-            <div class="col-lg-4 border-start">
-                <div class="p-4">
-                    <h5 class="mb-3"><i class="fas fa-cubes text-secondary d-block my-3 fa-2x"></i> Samples</h5>
-                    <p>See the example projects built with the ABP Framework.</p>
-                    <a href="https://abp.io/docs/latest/samples?ref=tmpl" target="_blank" class="btn btn-link px-1">All samples <i class="fas fa-chevron-right"></i></a>
-                </div>
-            </div>
-            <div class="col-lg-4 border-start">
-                <div class="p-4">
-                    <h5 class="mb-3"><i class="fas fa-users text-secondary d-block my-3 fa-2x"></i> ABP Community</h5>
-                    <p>Get involved with a vibrant community and become a contributor.</p>
-                    <a href="https://abp.io/community/" target="_blank" class="btn btn-link px-1">Community <i class="fas fa-chevron-right"></i></a>
-                    <a href="https://abp.io/docs/latest/contribution?ref=tmpl" target="_blank" class="btn btn-link px-1">Contribute <i class="fas fa-chevron-right"></i></a>
-                </div>
-            </div>
-        </div>
-        <div class="row text-center mt-lg-3 justify-content-md-center">
-            <div class="col-lg-4">
-                <div class="p-4">
-                    <h5 class="mb-3"><i class="fas fa-pen-nib text-secondary d-block my-3 fa-2x"></i> ABP Blog</h5>
-                    <p>Take a look at our recently published articles.</p>
-                    <a href="https://abp.io/blog?ref=tmpl" target="_blank" class="btn btn-link px-1">See Blog <i class="fas fa-chevron-right"></i></a>
-                </div>
-            </div>
-            <div class="col-lg-4 border-start">
-                <div class="p-4">
-                    <h5 class="mb-3"><i class="fab fa-github text-secondary d-block my-3 fa-2x"></i> Github</h5>
-                    <p>Do you love the ABP Framework? Please <strong>give a star</strong> to support it!</p>
-                    <a href="https://github.com/abpframework/abp/" target="_blank" class="btn btn-link px-1">See Open Source Framework <i class="fas fa-chevron-right"></i></a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- HERO -->
+<section class="container hero text-center" aria-label="Giriş bölümü">
+  <img class="logo" src="images/logo/leptonx/logo-light.png" alt="Expense Reports" />
+  <h1>Masraf Takip &amp; Raporlama</h1>
+  <p class="lead">Masraf raporlarını yönet, yeni rapor oluştur ve proje bazlı özetlerle daha hızlı karar ver.</p>
+
+  <div class="hero-cta mt-3 d-flex justify-content-center gap-2">
+    <button class="btn btn-brand" @onclick="GoToCreateReport" aria-label="Yeni masraf raporu oluştur">➕ Yeni Rapor</button>
+    <button class="btn btn-ghost" @onclick="GoToDashboard" aria-label="Gösterge panelini aç">📊 Gösterge Paneli</button>
+  </div>
+
+  <div class="badge-strip" role="list" aria-label="Öne çıkan nitelikler">
+    <span class="pill" role="listitem">Hızlı</span>
+    <span class="pill" role="listitem">Basit</span>
+    <span class="pill" role="listitem">Proje Bazlı</span>
+  </div>
+
+  <div class="quick-actions d-flex justify-content-center gap-2">
+    <button type="button" class="qa" @onclick="GoToExpenseReports" aria-label="Rapor listesine git">🧾 Rapor Listesi</button>
+    <button type="button" class="qa" @onclick="GoToCreateReport" aria-label="Yeni rapor oluştur">⚡ Hızlı Oluştur</button>
+    <button type="button" class="qa" @onclick="GoToDashboard" aria-label="Grafikleri görüntüle">📈 Haftalık Grafikler</button>
+  </div>
+</section>
+
+@code {
+  private void GoToExpenseReports() => Nav.NavigateTo("/expense-reports");
+  private void GoToCreateReport()   => Nav.NavigateTo("/expense-reports/create");
+  private void GoToDashboard()      => Nav.NavigateTo("/dashboard");
+
+  private void OnCardKey(KeyboardEventArgs e, Action navigate)
+  {
+      if (e.Key == "Enter" || e.Key == " ")
+      {
+          navigate();
+      }
+  }
+}

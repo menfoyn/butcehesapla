@@ -32,7 +32,7 @@
     <div class="mb-3">
         <label>Proje Seç</label>
         <InputSelect class="form-control" @bind-Value="createModel.ProjectId">
-            <option value="">Proje Seçin</option>
+            <option value="@Guid.Empty">Proje Seçin</option>
             @foreach (var project in projectList)
             {
                 <option value="@project.Id">@project.Name</option>
@@ -81,7 +81,7 @@
         </div>
     }
 
-    <button type="submit" class="btn btn-primary mt-3" disabled="@string.IsNullOrEmpty(createModel.ProjectId.ToString())">Kaydet</button>
+    <button type="submit" class="btn btn-primary mt-3" disabled="@(createModel.ProjectId == Guid.Empty)">Kaydet</button>
     <button type="button" class="btn btn-info" @onclick='() => Console.WriteLine("🧪 Tıklandı")'>Test</button>
     <button class="btn btn-warning" @onclick="AddSampleProject">📌 Örnek Proje Ekle</button>
 </EditForm>
@@ -101,6 +101,19 @@
     protected override async Task OnInitializedAsync()
     {
         projectList = await ProjectAppService.GetListAsync();
+
+        // Eğer hiç proje yoksa örnek projeleri bir kere ekle ve listeyi tazele
+        if (projectList == null || projectList.Count == 0)
+        {
+            await ProjectAppService.CreateSampleProjectAsync();
+            projectList = await ProjectAppService.GetListAsync();
+        }
+
+        // Varsayılan olarak ilk projeyi seç
+        if (projectList != null && projectList.Count > 0 && createModel.ProjectId == Guid.Empty)
+        {
+            createModel.ProjectId = projectList.OrderBy(p => p.Name).First().Id;
+        }
     }
 
     private async Task CreateReport()
@@ -155,6 +168,14 @@
     {
         await ProjectAppService.CreateSampleProjectAsync();
         projectList = await ProjectAppService.GetListAsync();
+
+        if (projectList != null && projectList.Count > 0)
+        {
+            // Kullanıcı için bir seçim olsun
+            createModel.ProjectId = projectList.OrderBy(p => p.Name).First().Id;
+        }
+
         Console.WriteLine("📌 Örnek proje eklendi.");
+        StateHasChanged();
     }
 }
