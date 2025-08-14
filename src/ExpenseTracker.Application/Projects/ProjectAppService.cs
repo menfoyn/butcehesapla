@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ExpenseTracker.Permissions;
 using ExpenseTracker.Projects.Dto;
 using ExpenseTracker.Projects.Services;
+using Microsoft.AspNetCore.Authorization;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 
 namespace ExpenseTracker.Projects;
+
 
 public class ProjectAppService : ApplicationService, IProjectAppService
 {
@@ -18,8 +21,9 @@ public class ProjectAppService : ApplicationService, IProjectAppService
         _repository = repository;
     }
 
-    public async Task<List<ProjectDto>> GetListAsync()
+    public  async Task<List<ProjectDto>> GetListAsync()
     {
+        
         var projects = await _repository.GetListAsync();
         return projects
             .OrderBy(x => x.Name)
@@ -31,7 +35,6 @@ public class ProjectAppService : ApplicationService, IProjectAppService
             })
             .ToList();
     }
-
     public async Task<ProjectDto> CreateAsync(CreateProjectDto input)
     {
         var entity = new Project(GuidGenerator.Create(), input.Name)

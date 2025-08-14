@@ -11,6 +11,7 @@ public class ExpenseTrackerPermissionDefinitionProvider : PermissionDefinitionPr
         var myGroup = context.AddGroup(ExpenseTrackerPermissions.GroupName);
         //Define your own permissions here. Example:
         //myGroup.AddPermission(ExpenseTrackerPermissions.MyPermission1, L("Permission:MyPermission1"));
+        myGroup.AddPermission(ExpenseTrackerPermissions.MyPermission1, L("Permission:MyPermission1"));
     }
 
     private static LocalizableString L(string name)
