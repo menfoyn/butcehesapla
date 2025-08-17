@@ -48,7 +48,8 @@ namespace ExpenseTracker.ExpenseReports.Services
                         Currency = string.IsNullOrWhiteSpace(i.Currency) ? "TRY" : i.Currency,
                         WorkedHours = i.WorkedHours,
                         Name = i.Name,
-                        ReceiptImagePath = i.ReceiptImagePath
+                        ReceiptImagePath = i.ReceiptImagePath,
+                        ReceiptPaths = i.ReceiptPaths ?? new List<string>()
                     };
 
                     expenseReport.AddItem(item);

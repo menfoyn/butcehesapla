@@ -7,12 +7,12 @@ public partial class ExpenseItemDto
 {
     public Guid Id { get; set; }
     public DateTime Date { get; set; }
+    public List<string> ReceiptPaths { get; set; } = new();
     public decimal Amount { get; set; }
     public string Description { get; set; }
     public Guid CategoryId { get; set; }
     public string Currency { get; set; }
     public string? ReceiptImagePath { get; set; } = string.Empty;
-    public IEnumerable<object> ReceiptPaths { get; set; }
     public string? ReceiptFilePath { get; set; }
     public string? ReceiptUrl { get; set; }
     public Dictionary<string, object> ExtraProperties { get; set; } = new();
