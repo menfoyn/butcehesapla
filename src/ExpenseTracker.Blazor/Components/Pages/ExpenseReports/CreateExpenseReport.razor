@@ -6,86 +6,155 @@
 @using ExpenseTracker.Projects.Dto
 @using ExpenseTracker.Projects.Services
 @using Volo.Abp.Validation
+@using Microsoft.AspNetCore.Components.Forms
 @inject IExpenseReportAppService ExpenseReportAppService
 @inject IProjectAppService ProjectAppService
 @inject NavigationManager NavigationManager
-<h3>CreateExpenseReport</h3>
-<EditForm Model="createModel" OnValidSubmit="CreateReport" OnInvalidSubmit="@(() => Console.WriteLine("❌ Form geçersiz"))">
+
+<div class="page-header d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h3 class="page-title mb-1">Yeni Masraf Raporu</h3>
+        <div class="text-muted small">Başlık, limit ve proje seçtikten sonra kalemlerinizi ekleyin. Fişleri satır bazında yükleyebilirsiniz.</div>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="Cancel">Geri Dön</button>
+</div>
+
+<EditForm Model="createModel" OnValidSubmit="CreateReport" OnInvalidSubmit="OnInvalidSubmitHandler">
     <DataAnnotationsValidator />
     <Blazorise.ValidationSummary />
 
-    <!-- Başlık -->
-    <div class="mb-3">
-        <label>Başlık</label>
-        <InputText class="form-control" @bind-Value="createModel.Title" />
-        <ValidationMessage For="@(() => createModel.Title)" />
-    </div>
-
-    <!-- Harcama Limiti -->
-    <div class="mb-3">
-        <label>Harcama Limiti (₺)</label>
-        <InputNumber class="form-control" @bind-Value="createModel.SpendingLimit" />
-        <ValidationMessage For="@(() => createModel.SpendingLimit)" />
-    </div>
-
-    <!-- Proje Seçimi -->
-    <div class="mb-3">
-        <label>Proje Seç</label>
-        <InputSelect class="form-control" @bind-Value="createModel.ProjectId">
-            <option value="@Guid.Empty">Proje Seçin</option>
-            @foreach (var project in projectList)
-            {
-                <option value="@project.Id">@project.Name</option>
-            }
-        </InputSelect>
-        <ValidationMessage For="@(() => createModel.ProjectId)" />
-    </div>
-
-    <!-- Masraf Kalemleri -->
-    @foreach (var item in createModel.Items)
-    {
-        <div class="border p-3 mb-3 rounded">
-            <InputText class="form-control mb-2" placeholder="Masraf Adı" @bind-Value="item.Name" />
-            <ValidationMessage For="@(() => item.Name)" />
-            <InputText class="form-control mb-2" placeholder="Açıklama" @bind-Value="item.Description" />
-            <ValidationMessage For="@(() => item.Description)" />
-            <InputNumber class="form-control mb-2" placeholder="Tutar ₺" @bind-Value="item.Amount" />
-            <ValidationMessage For="@(() => item.Amount)" />
-            <InputSelect class="form-control mb-2" @bind-Value="item.Category">
-                <option value="">Kategori Seçin</option>
-                @foreach (var category in categoryList)
-                {
-                    <option value="@category">@category</option>
-                }
-            </InputSelect>
-            <ValidationMessage For="@(() => item.Category)" />
-            <InputNumber class="form-control mb-2" placeholder="Çalışma Saati" @bind-Value="item.WorkedHours" />
-            <ValidationMessage For="@(() => item.WorkedHours)" />
-            <InputText class="form-control mb-2" placeholder="Para Birimi (örneğin: TRY, USD)" @bind-Value="item.Currency" />
-            <ValidationMessage For="@(() => item.Currency)" />
-
-            <!-- Fiş Yükleme -->
-            <InputFile OnChange="e => UploadFile(e, item)" />
-
-            @if (item.ReceiptPaths != null && item.ReceiptPaths.Any())
-            {
-                <div class="mt-2">
-                    @foreach (var path in item.ReceiptPaths)
-                    {
-                        <div>
-                            <a href="@path" target="_blank">📎 Fişi Görüntüle</a>
-                        </div>
-                    }
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Başlık -->
+                <div class="col-12 col-lg-6">
+                    <label class="form-label fw-semibold">Başlık</label>
+                    <InputText class="form-control" @bind-Value="createModel.Title" />
+                    <ValidationMessage For="@(() => createModel.Title)" />
                 </div>
-            }
+
+                <!-- Harcama Limiti -->
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label fw-semibold">Harcama Limiti (₺)</label>
+                    <InputNumber class="form-control" @bind-Value="createModel.SpendingLimit" />
+                    <ValidationMessage For="@(() => createModel.SpendingLimit)" />
+                </div>
+
+                <!-- Proje Seçimi -->
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label fw-semibold">Proje Seç</label>
+                    <InputSelect class="form-select" @bind-Value="createModel.ProjectId">
+                        <option value="@Guid.Empty">Proje Seçin</option>
+                        @foreach (var project in projectList)
+                        {
+                            <option value="@project.Id">@project.Name</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => createModel.ProjectId)" />
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <h5 class="mb-0">Masraf Kalemleri</h5>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddItem">+ Kalem Ekle</button>
+            <button type="button" class="btn btn-outline-warning btn-sm" @onclick="AddSampleProject">📌 Örnek Proje Ekle</button>
+        </div>
+    </div>
+
+    @foreach (var pair in createModel.Items.Select((value, index) => new { value, index }))
+    {
+        var row = pair.value;
+        <div class="card item-card shadow-sm mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div class="small text-muted fw-semibold">Kalem @(pair.index + 1)</div>
+                <button type="button" class="btn btn-link text-danger p-0 small" title="Kaldır" @onclick="() => RemoveItem(row)">Kaldır</button>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label small">Masraf Adı</label>
+                        <InputText class="form-control" placeholder="Örn. Otel" @bind-Value="row.Name" />
+                        <ValidationMessage For="@(() => row.Name)" />
+                    </div>
+                    <div class="col-12 col-md-5">
+                        <label class="form-label small">Açıklama</label>
+                        <InputText class="form-control" placeholder="Kısa açıklama" @bind-Value="row.Description" />
+                        <ValidationMessage For="@(() => row.Description)" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small">Tutar (₺)</label>
+                        <InputNumber class="form-control" placeholder="0" @bind-Value="row.Amount" />
+                        <ValidationMessage For="@(() => row.Amount)" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small">Kategori</label>
+                        <InputSelect class="form-select" @bind-Value="row.Category">
+                            <option value="">Kategori Seçin</option>
+                            @foreach (var category in categoryList)
+                            {
+                                <option value="@category">@category</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => row.Category)" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small">Çalışma Saati</label>
+                        <InputNumber class="form-control" placeholder="0" @bind-Value="row.WorkedHours" />
+                        <ValidationMessage For="@(() => row.WorkedHours)" />
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small">Para Birimi</label>
+                        <InputText class="form-control" placeholder="Örn. TRY, USD" @bind-Value="row.Currency" />
+                        <ValidationMessage For="@(() => row.Currency)" />
+                    </div>
+
+                    <!-- Fiş Yükleme -->
+                    <div class="col-12 col-md-3">
+                        <label class="form-label small mb-1">Fiş / Ek</label>
+                        <InputFile OnChange="@((InputFileChangeEventArgs e) => UploadFile(e, row))" />
+                        @if (row.ReceiptPaths != null && row.ReceiptPaths.Any())
+                        {
+                            <ul class="file-list mt-2">
+                                @foreach (var path in row.ReceiptPaths)
+                                {
+                                    <li><a href="@path" target="_blank">📎 Fişi Görüntüle</a></li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </div>
+            </div>
         </div>
     }
 
-    <button type="submit" class="btn btn-primary mt-3" disabled="@(createModel.ProjectId == Guid.Empty)">Kaydet</button>
-    <button type="button" class="btn btn-info" @onclick='() => Console.WriteLine("🧪 Tıklandı")'>Test</button>
-    <button class="btn btn-warning" @onclick="AddSampleProject">📌 Örnek Proje Ekle</button>
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary" disabled="@(createModel.ProjectId == Guid.Empty)">Kaydet</button>
+        <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">Vazgeç</button>
+    </div>
 </EditForm>
+
+<style>
+    .page-title { font-weight: 800; }
+    .item-card .card-header { background: #f8f9fa; }
+    .file-list { list-style: none; padding-left: 0; margin: 0; }
+    .file-list li { margin-bottom: .25rem; }
+    @@media (min-width: 992px) {
+        .item-card .form-control, .item-card .form-select { height: 38px; }
+    }
+</style>
+
 @code {
+    private void OnInvalidSubmitHandler()
+    {
+        Console.WriteLine("❌ Form geçersiz");
+    }
+
+    private void Cancel() => NavigationManager.NavigateTo("/expense-reports");
+
     private List<string> categoryList = new()
     {
         "Ulaşım", "Konaklama", "Yemek", "Ofis", "Ekipman", "Yolculuk", "Diğer"
@@ -162,6 +231,17 @@
             item.ReceiptPaths = new List<string>();
         }
         item.ReceiptPaths.Add($"/receipts/{file.Name}");
+    }
+
+    private void AddItem()
+    {
+        createModel.Items ??= new List<CreateExpenseItemDto>();
+        createModel.Items.Add(new CreateExpenseItemDto());
+    }
+
+    private void RemoveItem(CreateExpenseItemDto item)
+    {
+        createModel.Items?.Remove(item);
     }
 
     private async Task AddSampleProject()

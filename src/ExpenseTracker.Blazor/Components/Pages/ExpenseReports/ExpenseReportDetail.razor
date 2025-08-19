@@ -26,7 +26,7 @@ else
                             <h5 class="card-title mb-1">@_report.Title</h5>
                             <div class="text-muted small">Rapor ID: @_report.Id</div>
                         </div>
-                        <span class="badge bg-secondary">@_report.Status</span>
+                        <span class="badge @StatusBadgeClass(_report.Status)">@_report.Status</span>
                     </div>
 
                     <hr />
@@ -95,7 +95,7 @@ else
             <div class="d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Kalemler (@(_report.Items?.Count ?? 0))</h6>
                 <div class="small text-muted">
-                    Toplam: <b>@Currency(_report.TotalAmount, null)</b>
+                    Toplam: <b>@Currency(_report.TotalAmount, null)</b> &nbsp;|&nbsp; Toplam Saat: <b>@TotalWorkedHours()</b>
                 </div>
             </div>
         </div>
@@ -114,6 +114,8 @@ else
                                 <th style="width:120px;">Tarih</th>
                                 <th>Açıklama</th>
                                 <th style="width:140px;" class="text-end">Tutar</th>
+                                <th style="width:140px;">Kategori</th>
+                                <th style="width:140px;" class="text-end">Çalışma Saati</th>
                                 <th style="width:220px;">Fiş / Ek</th>
                             </tr>
                         </thead>
@@ -124,6 +126,8 @@ else
                                 <td>@(it.Date == default ? "-" : it.Date.ToString("yyyy-MM-dd"))</td>
                                 <td>@(string.IsNullOrWhiteSpace(it.Description) ? "-" : it.Description)</td>
                                 <td class="text-end">@Currency(it.Amount, null)</td>
+                                <td>@(string.IsNullOrWhiteSpace(it.Category) ? "-" : it.Category)</td>
+                                <td class="text-end">@((it.WorkedHours > 0) ? it.WorkedHours.ToString("0.##") : "-")</td>
                                 <td>
                                     @{
                                         var files = GetReceiptFiles(it);
@@ -169,6 +173,15 @@ else
 
     private void GoBack() => Nav.NavigateTo("/expense-reports");
 
+    private string TotalWorkedHours()
+    {
+        if (_report?.Items == null || _report.Items.Count == 0)
+            return "-";
+
+        var sum = _report.Items.Sum(i => i?.WorkedHours ?? 0m);
+        return sum > 0 ? sum.ToString("0.##") : "-";
+    }
+
     // SpendingLimit hem decimal hem decimal? olabilir: ikisini de destekle
     private static bool HasLimit(decimal? v) => v.HasValue && v.Value > 0m;
     private static decimal Val(decimal? v) => v ?? 0m;
@@ -191,22 +204,20 @@ else
     {
         var list = new List<string>();
 
-        // 1) Direct DTO collections
-        if (it?.ReceiptPaths is IEnumerable<string> rpStr)
+        // 1) Direct DTO collections (additive)
+        if (it?.ReceiptPaths is IEnumerable<string> rpStr1)
         {
-            list.AddRange(rpStr.Where(s => !string.IsNullOrWhiteSpace(s)));
+            list.AddRange(rpStr1.Where(s => !string.IsNullOrWhiteSpace(s)));
         }
-        else if (it?.ReceiptPaths is IEnumerable<object> rpObj)
+        else if (it?.ReceiptPaths is IEnumerable<object> rpObj1)
         {
-            list.AddRange(rpObj
-                .OfType<string>()
-                .Where(s => !string.IsNullOrWhiteSpace(s)));
+            list.AddRange(rpObj1.OfType<string>().Where(s => !string.IsNullOrWhiteSpace(s)));
         }
 
-        // 2) Single-path fallbacks
-        else if (!string.IsNullOrWhiteSpace(it?.ReceiptFilePath)) list.Add(it!.ReceiptFilePath!);
-        else if (!string.IsNullOrWhiteSpace(it?.ReceiptUrl))      list.Add(it!.ReceiptUrl!);
-        else if (!string.IsNullOrWhiteSpace(it?.ReceiptImagePath))list.Add(it!.ReceiptImagePath!);
+        // 2) Single-path fallbacks (add even if list already has values)
+        if (!string.IsNullOrWhiteSpace(it?.ReceiptFilePath)) list.Add(it!.ReceiptFilePath!);
+        if (!string.IsNullOrWhiteSpace(it?.ReceiptUrl))      list.Add(it!.ReceiptUrl!);
+        if (!string.IsNullOrWhiteSpace(it?.ReceiptImagePath))list.Add(it!.ReceiptImagePath!);
 
         // 3) ExtraProperties (ABP) — robust parsing for string, array, or JsonElement
         try
@@ -282,5 +293,17 @@ else
                 }
                 yield break;
         }
+    }
+
+    private static string StatusBadgeClass(string status)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return "bg-secondary";
+        return status.ToLowerInvariant() switch
+        {
+            "approved" => "bg-success",
+            "rejected" => "bg-danger",
+            "pending"  => "bg-warning text-dark",
+            _ => "bg-secondary"
+        };
     }
 }

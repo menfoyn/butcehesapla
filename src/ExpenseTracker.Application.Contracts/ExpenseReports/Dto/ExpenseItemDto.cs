@@ -17,4 +17,5 @@ public partial class ExpenseItemDto
     public string? ReceiptUrl { get; set; }
     public Dictionary<string, object> ExtraProperties { get; set; } = new();
     public string? Category { get; set; }
+    public decimal WorkedHours { get; set; }
 }

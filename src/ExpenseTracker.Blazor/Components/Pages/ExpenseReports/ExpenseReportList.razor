@@ -2,15 +2,26 @@
 @using System.Globalization
 @using ExpenseTracker.ExpenseReports
 @using ExpenseTracker.ExpenseReports.Services
+@using ExpenseTracker.Projects.Services
 @inject IExpenseReportAppService ExpenseReportAppService
+@inject IProjectAppService ProjectAppService
 @inject NavigationManager NavigationManager
 @using System.Linq
 
-<div class="d-flex align-items-center justify-content-between mb-3">
-    <h3 class="mb-0">Masraf Raporları</h3>
-    <button class="btn btn-primary" @onclick="NavigateToCreate">
-        + Yeni Rapor Ekle
-    </button>
+<div class="page-toolbar">
+    <div class="left">
+        <h3 class="page-title mb-0">Masraf Raporları</h3>
+        <span class="muted ms-2 d-none d-sm-inline">(@FilteredReports.Count() adet)</span>
+    </div>
+    <div class="right d-flex align-items-center gap-2">
+        <div class="search-wrap">
+            <span class="search-icon">🔎</span>
+            <input class="form-control form-control-sm search-input" placeholder="Ara: başlık, proje, durum…" @bind="search" @bind:event="oninput" />
+        </div>
+        <button class="btn btn-primary" @onclick="NavigateToCreate">
+            + Yeni Rapor Ekle
+        </button>
+    </div>
 </div>
 
 @if (isLoading)
@@ -27,44 +38,138 @@ else
         <table class="table align-middle">
             <thead class="table-light">
                 <tr>
-                    <th style="min-width: 280px;">Kategori / Başlık</th>
+                    <th style="min-width: 280px;">Kategori / Proje / Başlık</th>
                     <th style="width: 140px;" class="text-end">Toplam</th>
                     <th style="width: 120px;">Durum</th>
                     <th style="width: 160px;" class="text-end">İşlemler</th>
                 </tr>
             </thead>
             <tbody>
-            @foreach (var report in reports)
+            @foreach (var report in FilteredReports)
             {
                 <tr>
                     <td>
                         <div class="fw-semibold">@DisplayProject(report)</div>
-                        <div class="text-muted small">@(!string.IsNullOrWhiteSpace(report.Title) ? report.Title : "(Başlıksız)")</div>
+                        @if (_categoriesById.TryGetValue(report.Id, out var cats) && cats.Any())
+                        {
+                            <div class="mt-1">
+                                @foreach (var c in cats)
+                                {
+                                    <span class="badge bg-light border text-dark me-1">@c</span>
+                                }
+                            </div>
+                        }
+                        <div class="subtle text-truncate">@(!string.IsNullOrWhiteSpace(report.Title) ? report.Title : "(Başlıksız)")</div>
                     </td>
                     <td class="text-end">@Currency(report.TotalAmount, null)</td>
                     <td>
                         <span class="badge @StatusBadge(report.Status)">@report.Status</span>
                     </td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ViewDetails(report.Id)">Detay</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteReport(report.Id)">Sil</button>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary" title="Detay" @onclick="() => ViewDetails(report.Id)">Detay</button>
+                            <button class="btn btn-outline-danger" title="Sil" @onclick="() => DeleteReport(report.Id)">Sil</button>
+                        </div>
                     </td>
                 </tr>
             }
             </tbody>
         </table>
+        <div class="table-hint text-muted small mt-2">Toplam: @FilteredReports.Count() kayıt</div>
     </div>
 }
 
+<style>
+/* Toolbar */
+.page-toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem; }
+.page-toolbar .left { display:flex; align-items:center; }
+.page-title { font-weight:800; letter-spacing:.2px; }
+.muted { color:#6c757d; font-weight:500; }
+.search-wrap { position:relative; }
+.search-icon { position:absolute; left:.5rem; top:50%; transform:translateY(-50%); opacity:.6; }
+.search-input { padding-left:1.8rem; min-width:220px; }
+
+/* Table polish */
+.table-responsive { border-radius:.75rem; box-shadow:0 1px 2px rgba(16,24,40,.06), 0 1px 1px rgba(16,24,40,.04); background:#fff; }
+.table { margin-bottom:0; }
+.table thead th { font-weight:700; letter-spacing:.2px; color:#495057; border-bottom:1px solid #e9ecef; }
+.table tbody tr { transition:background .15s ease, transform .05s ease; }
+.table tbody tr:hover { background:#fafbfc; }
+.table .badge { font-weight:600; border:1px solid rgba(0,0,0,.08); }
+
+/* Status pill palette */
+.badge.bg-success { background: #e6f4ea!important; color:#157347; border-color:#cce9d5!important; }
+.badge.bg-info { background:#e7f1fb!important; color:#0a58ca; border-color:#d3e4fa!important; }
+.badge.bg-danger { background:#fde7ea!important; color:#b02a37; border-color:#f7ccd2!important; }
+.badge.bg-warning { background:#fff6e6!important; color:#997404; border-color:#ffe7ba!important; }
+.badge.bg-secondary { background:#eef1f4!important; color:#495057; border-color:#e2e6ea!important; }
+.badge.text-dark { color:#664d03!important; }
+
+/* Subtle secondary line under main label */
+.subtle { color:#6c757d; font-size:.875rem; }
+
+/* Amount column alignment tweak */
+.table td.text-end, .table th.text-end { white-space:nowrap; }
+
+/* Small footer hint */
+.table-hint { padding:.25rem .25rem .75rem .25rem; }
+
+/* Category badges spacing */
+.badge + .badge { margin-left:.25rem; }
+
+@@media (max-width: 576px) {
+  .search-input { min-width: 160px; }
+  .page-toolbar { flex-direction: column; align-items: stretch; gap:.5rem; }
+  .page-toolbar .right { justify-content: space-between; }
+}
+</style>
+
 @code {
+    private string search = string.Empty;
+
+    private IEnumerable<ExpenseReportDto> FilteredReports =>
+        string.IsNullOrWhiteSpace(search)
+            ? reports
+            : reports.Where(r =>
+                (r.Title?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false) ||
+                (r.ProjectName?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false) ||
+                (r.Status?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false) ||
+                (_displayNameById.TryGetValue(r.Id, out var dn) && dn.Contains(search, StringComparison.CurrentCultureIgnoreCase))
+            );
+
     private List<ExpenseReportDto> reports = new();
     private bool isLoading = true;
     // ReportId -> Resolved display label (Category or ProjectName)
     private readonly Dictionary<Guid, string> _displayNameById = new();
+    // ReportId -> Distinct categories in the report (for visual badges)
+    private readonly Dictionary<Guid, List<string>> _categoriesById = new();
+    // ProjectId -> Project Name (for quick lookup)
+    private readonly Dictionary<Guid, string> _projectNameById = new();
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadProjectsAsync();
         await LoadReportsAsync();
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        _projectNameById.Clear();
+        try
+        {
+            var projects = await ProjectAppService.GetListAsync();
+            if (projects != null)
+            {
+                foreach (var p in projects.Where(p => p != null && p.Id != Guid.Empty && !string.IsNullOrWhiteSpace(p.Name)))
+                {
+                    _projectNameById[p.Id] = p.Name!.Trim();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading projects: {ex.Message}");
+        }
     }
 
     private async Task LoadReportsAsync()
@@ -84,6 +189,7 @@ else
             Console.WriteLine($"Error loading reports: {ex.Message}");
             reports = new List<ExpenseReportDto>();
             _displayNameById.Clear();
+            _categoriesById.Clear();
         }
         finally
         {
@@ -94,6 +200,7 @@ else
     private async Task PreloadDisplayNamesAsync()
     {
         _displayNameById.Clear();
+        _categoriesById.Clear();
 
         foreach (var r in reports)
         {
@@ -102,23 +209,42 @@ else
                 // Detay çağrısı: Items ve ProjectName kesin gelir
                 var full = await ExpenseReportAppService.GetAsync(r.Id);
 
-                var category = full?.Items?.FirstOrDefault()?.Category;
+                // Kategori ismi (ilk kategori) ya da Proje adı
+                var firstCategory = full?.Items?.FirstOrDefault(i => !string.IsNullOrWhiteSpace(i?.Category))?.Category;
                 string? name = null;
 
-                if (!string.IsNullOrWhiteSpace(category))
+                if (!string.IsNullOrWhiteSpace(firstCategory))
                 {
-                    name = category!.ToUpperInvariant();
+                    name = firstCategory!.ToUpperInvariant();
                 }
                 else if (!string.IsNullOrWhiteSpace(full?.ProjectName))
                 {
                     name = full!.ProjectName!.ToUpperInvariant();
                 }
+                else if (!string.IsNullOrWhiteSpace(r?.ProjectName))
+                {
+                    name = r!.ProjectName!.ToUpperInvariant();
+                }
+                if (string.IsNullOrWhiteSpace(name) && r.ProjectId != Guid.Empty && _projectNameById.TryGetValue(r.ProjectId, out var pn) && !string.IsNullOrWhiteSpace(pn))
+                {
+                    name = pn;
+                }
 
                 _displayNameById[r.Id] = name ?? "(KATEGORİ / PROJE YOK)";
+
+                // Distinct kategori rozetleri
+                var cats = full?.Items?
+                    .Where(i => !string.IsNullOrWhiteSpace(i?.Category))
+                    .Select(i => i!.Category!.Trim())
+                    .Distinct(StringComparer.InvariantCultureIgnoreCase)
+                    .ToList() ?? new List<string>();
+
+                _categoriesById[r.Id] = cats;
             }
             catch
             {
                 _displayNameById[r.Id] = "(KATEGORİ / PROJE YOK)";
+                _categoriesById[r.Id] = new List<string>();
             }
         }
     }
@@ -143,16 +269,22 @@ else
     // --- UI helpers ---
     private string DisplayProject(ExpenseReportDto r)
     {
+        // Önce cache
         if (r != null && _displayNameById.TryGetValue(r.Id, out var cached) && !string.IsNullOrWhiteSpace(cached))
             return cached;
 
-        // Fallback (list DTO'su Items getirmiyorsa çoğunlukla boş kalır)
+        // Hızlı fallback: liste DTO'sunda proje varsa
+        if (!string.IsNullOrWhiteSpace(r?.ProjectName))
+            return r!.ProjectName!.ToUpperInvariant();
+
+        // Fallback: resolve by ProjectId via cached project list
+        if (r != null && r.ProjectId != Guid.Empty && _projectNameById.TryGetValue(r.ProjectId, out var pname) && !string.IsNullOrWhiteSpace(pname))
+            return pname.ToUpperInvariant();
+
+        // Hızlı fallback: liste DTO'sunda item ve kategori varsa
         var category = r?.Items?.FirstOrDefault()?.Category;
         if (!string.IsNullOrWhiteSpace(category))
             return category!.ToUpperInvariant();
-
-        if (!string.IsNullOrWhiteSpace(r?.ProjectName))
-            return r!.ProjectName!.ToUpperInvariant();
 
         return "(KATEGORİ / PROJE YOK)";
     }

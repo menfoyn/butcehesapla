@@ -40,30 +40,41 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             from p in gp.DefaultIfEmpty()
             select new
             {
-                ProjectId   = r.ProjectId,            // Guid?
-                ProjectName = p != null ? p.Name : null,
-                ItemDate    = i.Date,
-                ItemAmount  = i.Amount,
+                ProjectId    = r.ProjectId,            // Guid
+                ProjectName  = p != null ? p.Name : null,
+                ItemDate     = i.Date,
+                ItemAmount   = i.Amount,
+                ItemHours    = i.WorkedHours
             };
 
         var rows = await AsyncExecuter.ToListAsync(projectedQuery);
 
+        // Aggregate budgets per project from reports (distinct from items)
+        var reportLimits = await AsyncExecuter.ToListAsync(
+            from r in reportQ
+            group r by r.ProjectId into g
+            select new { ProjectId = g.Key, TotalLimit = g.Sum(x => (decimal)x.SpendingLimit) }
+        );
+        var budgetByProject = reportLimits.ToDictionary(x => x.ProjectId, x => x.TotalLimit);
+
         // ---- Overall totals ----
         var totalInvoiced = rows.Sum(x => x.ItemAmount);
-        var totalBudget   = totalInvoiced; // until you add a real budget source
+        var totalBudget   = reportLimits.Sum(x => x.TotalLimit);
+        var totalHoursDec = rows.Sum(x => x.ItemHours);
 
         // ---- Weekly totals (last 8 weeks) ----
         var start = DateTime.UtcNow.Date.AddDays(-7 * 7);
-        var weeklyDict = new Dictionary<string, (decimal actual, decimal invoiced, int hours)>();
+        var weeklyDict = new Dictionary<string, (decimal actual, decimal invoiced, decimal hours)>();
 
         foreach (var x in rows)
         {
             if (x.ItemDate < start) continue;
             var week = ISOWeek.GetWeekOfYear(x.ItemDate);
             var key  = $"{x.ItemDate.Year}-W{week:D2}";
-            if (!weeklyDict.TryGetValue(key, out var agg)) agg = (0m, 0m, 0);
+            if (!weeklyDict.TryGetValue(key, out var agg)) agg = (0m, 0m, 0m);
             agg.actual   += x.ItemAmount;
             agg.invoiced += x.ItemAmount;
+            agg.hours    += x.ItemHours;
             weeklyDict[key] = agg;
         }
 
@@ -74,19 +85,20 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
                 WeekLabel   = kv.Key,
                 Actual      = kv.Value.actual,
                 Invoiced    = kv.Value.invoiced,
-                WorkedHours = kv.Value.hours
+                WorkedHours = (int)Math.Round(kv.Value.hours)
             })
             .ToList();
 
         // ---- Project cards ----
         var UNASSIGNED = Guid.Empty;
-        var projectAgg = new Dictionary<Guid, (decimal amount, string? name, int worked, int total)>();
+        var projectAgg = new Dictionary<Guid, (decimal amount, string? name, decimal hours)>();
 
         foreach (var x in rows)
         {
             var pid = (x.ProjectId == Guid.Empty ? UNASSIGNED : x.ProjectId);
-            if (!projectAgg.TryGetValue(pid, out var agg)) agg = (0m, null, 0, 0);
+            if (!projectAgg.TryGetValue(pid, out var agg)) agg = (0m, null, 0m);
             agg.amount += x.ItemAmount;
+            agg.hours  += x.ItemHours;
             if (string.IsNullOrWhiteSpace(agg.name)) agg.name = x.ProjectName; // first non-empty name wins
             projectAgg[pid] = agg;
         }
@@ -99,10 +111,10 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
                 ProjectName    = !string.IsNullOrWhiteSpace(kv.Value.name)
                                    ? kv.Value.name!
                                    : (kv.Key == UNASSIGNED ? "Atanmamış" : kv.Key.ToString()),
-                Budget         = kv.Value.amount,
+                Budget         = budgetByProject.TryGetValue(kv.Key, out var b) ? b : 0m,
                 InvoicedAmount = kv.Value.amount,
-                WorkedHours    = kv.Value.worked,
-                TotalHours     = kv.Value.total
+                WorkedHours    = (int)Math.Round(kv.Value.hours),
+                TotalHours     = (int)Math.Round(kv.Value.hours)
             })
             .ToList();
 
@@ -113,7 +125,7 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
         var workedSeries   = weeklyList.Select(w => w.WorkedHours).ToList();
 
         // ---- Per‑project weekly breakdown ----
-        var perProjectTmp = new Dictionary<Guid, Dictionary<string, (decimal actual, decimal invoiced, int hours)>>();
+        var perProjectTmp = new Dictionary<Guid, Dictionary<string, (decimal actual, decimal invoiced, decimal hours)>>();
 
         foreach (var x in rows)
         {
@@ -121,15 +133,16 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             var pid = (x.ProjectId == Guid.Empty ? UNASSIGNED : x.ProjectId);
             if (!perProjectTmp.TryGetValue(pid, out var weekMap))
             {
-                weekMap = new Dictionary<string, (decimal actual, decimal invoiced, int hours)>();
+                weekMap = new Dictionary<string, (decimal actual, decimal invoiced, decimal hours)>();
                 perProjectTmp[pid] = weekMap;
             }
 
             var week = ISOWeek.GetWeekOfYear(x.ItemDate);
             var key  = $"{x.ItemDate.Year}-W{week:D2}";
-            if (!weekMap.TryGetValue(key, out var agg)) agg = (0m, 0m, 0);
+            if (!weekMap.TryGetValue(key, out var agg)) agg = (0m, 0m, 0m);
             agg.actual   += x.ItemAmount;
             agg.invoiced += x.ItemAmount;
+            agg.hours    += x.ItemHours;
             weekMap[key] = agg;
         }
 
@@ -143,7 +156,7 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
                     WeekLabel   = kv.Key,
                     Actual      = kv.Value.actual,
                     Invoiced    = kv.Value.invoiced,
-                    WorkedHours = kv.Value.hours
+                    WorkedHours = (int)Math.Round(kv.Value.hours)
                 })
                 .ToList();
         }
@@ -152,13 +165,13 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
         {
             TotalBudget        = totalBudget,
             InvoicedAmount     = totalInvoiced,
-            TotalHours         = 0,
-            WorkedHours        = 0,
+            TotalHours         = (int)Math.Round((decimal)totalHoursDec),
+            WorkedHours        = (int)Math.Round((decimal)totalHoursDec),
             ProjectSummaries   = projectCards,
             WeekLabels         = weekLabels,
             ActualSeries       = actualSeries,
             InvoicedSeries     = invoicedSeries,
-            WorkedHoursSeries  = workedSeries,
+            WorkedHoursSeries  = weeklyList.Select(w => w.WorkedHours).ToList(),
             WeeklyDataByProject = weeklyByProject
         };
     }

@@ -20,9 +20,20 @@ else
         <div class="col-md-6 mb-3">
             <div class="card shadow-sm p-3">
                 <h5>Bütçe Özeti</h5>
-                <p><strong>Toplam Bütçe:</strong> ₺@dashboard.TotalBudget</p>
-                <p><strong>Faturalanan:</strong> ₺@dashboard.InvoicedAmount</p>
-                <p><strong>Kalan:</strong> ₺@dashboard.RemainingAmount</p>
+                @{
+                    var totalBudget = dashboard.TotalBudget;
+                    // Eğer backend doğru faturalananı dönmüyorsa, haftalık gerçekleşen toplamını yedek olarak kullan
+                    var invoiced    = dashboard.InvoicedAmount > 0 ? dashboard.InvoicedAmount : (dashboard.ActualSeries?.Sum() ?? 0m);
+                    var remaining   = Math.Max(0m, totalBudget - invoiced);
+                    var usedPct     = totalBudget > 0 ? (int)Math.Min(100, (invoiced * 100m / totalBudget)) : 0;
+                }
+                <p><strong>Toplam Bütçe:</strong> ₺@totalBudget.ToString("N2")</p>
+                <p><strong>Faturalanan:</strong> ₺@invoiced.ToString("N2")</p>
+                <p><strong>Kalan:</strong> ₺@remaining.ToString("N2")</p>
+                <div class="progress" style="height:10px;">
+                    <div class="progress-bar" role="progressbar" style="width:@usedPct%" aria-valuenow="@usedPct" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <small class="text-muted">Kullanım: @usedPct%</small>
             </div>
         </div>
         <div class="col-md-6 mb-3">
@@ -46,13 +57,16 @@ else
                             <h6 class="card-title mb-2">@p.ProjectName</h6>
                             <span class="badge bg-secondary">@p.ProjectId.ToString()[..8]</span>
                         </div>
-                        <div class="small text-muted mb-2">Bütçe: ₺@p.Budget</div>
-                        <div class="mb-2"><strong>Faturalanan:</strong> ₺@p.InvoicedAmount</div>
+                        <div class="small text-muted mb-2">Bütçe: ₺@p.Budget.ToString("N2")</div>
+                        <div class="mb-2"><strong>Faturalanan:</strong> ₺@p.InvoicedAmount.ToString("N2")</div>
                         <div class="progress mb-2" style="height:8px;">
                             <div class="progress-bar" role="progressbar"
                                  style="width:@(p.Budget > 0 ? Math.Min(100, (int)(p.InvoicedAmount * 100 / p.Budget)) : 0)%"></div>
                         </div>
-                        <div class="small">Kalan: ₺@p.RemainingAmount</div>
+                        @{
+                            var projUsedPct = p.Budget > 0 ? (int)Math.Min(100, (p.InvoicedAmount * 100m / p.Budget)) : 0;
+                        }
+                        <div class="small">Kalan: ₺@p.RemainingAmount.ToString("N2") — <span class="text-muted">@projUsedPct% kullanıldı</span></div>
                         <div class="mt-3">
                             <div class="small text-muted mb-1">Haftalık Harcama</div>
                             <canvas id="@($"pc-{p.ProjectId:N}")" height="90"></canvas>
@@ -117,8 +131,8 @@ else
                     {
                         <tr>
                             <td>@item.WeekLabel</td>
-                            <td>@item.Actual ₺</td>
-                            <td>@item.Invoiced ₺</td>
+                            <td>₺@item.Actual.ToString("N2")</td>
+                            <td>₺@item.Invoiced.ToString("N2")</td>
                             <td>@item.WorkedHours saat</td>
                         </tr>
                     }
@@ -137,7 +151,7 @@ else
 <!-- Chart.js (provided by LeptonX theme assets). If the path changes in your theme, update below. -->
 <script src="/_content/Volo.Abp.AspNetCore.Components.Web.LeptonXLiteTheme/side-menu/libs/chart.js/Chart.min.js"></script>
 <script>
-    window.renderWeeklyChart = function (labels, actual, invoiced) {
+    window.renderWeeklyChart = function (labels, actual, invoiced, worked) {
         const ctx = document.getElementById('weeklyChart');
         if (!ctx || !window.Chart) return;
         // dispose previous instance if any
@@ -146,10 +160,37 @@ else
             labels: labels,
             datasets: [
                 { label: 'Gerçekleşen', data: actual, fill: false, tension: 0.3 },
-                { label: 'Faturalanan', data: invoiced, fill: false, tension: 0.3 }
+                { label: 'Faturalanan', data: invoiced, fill: false, tension: 0.3 },
+                { label: 'Çalışılan Saat', data: worked, fill: false, tension: 0.3 }
             ]
         };
-        const cfg = { type: 'line', data: data, options: { responsive: true, plugins: { legend: { position: 'top' } } } };
+        const cfg = {
+          type: 'line',
+          data: data,
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: 'top' },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => {
+                    const v = ctx.parsed.y;
+                    const label = ctx.dataset.label || '';
+                    if (label.includes('Saat')) return `${label}: ${v}`;
+                    return `${label}: ₺${Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`;
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: function(value){ return '₺' + Number(value).toLocaleString('tr-TR'); }
+                }
+              }
+            }
+          }
+        };
         ctx._chart = new Chart(ctx, cfg);
     }
 
@@ -162,10 +203,11 @@ else
             const data = {
                 labels: it.labels,
                 datasets: [
-                    { label: 'Harcanan', data: it.actual, fill: false, tension: 0.3 }
+                    { label: 'Harcanan', data: it.actual, fill: false, tension: 0.3 },
+                    { label: 'Çalışılan Saat', data: it.worked, fill: false, tension: 0.3 }
                 ]
             };
-            const cfg = { type: 'line', data: data, options: { responsive: true, plugins: { legend: { display: false } } } };
+            const cfg = { type: 'line', data: data, options: { responsive: true, plugins: { legend: { display: true } } } };
             ctx._chart = new Chart(ctx, cfg);
         });
     }
@@ -188,21 +230,24 @@ else
             var labels   = dashboard.WeekLabels ?? new List<string>();
             var actual   = dashboard.ActualSeries ?? new List<decimal>();
             var invoiced = dashboard.InvoicedSeries ?? new List<decimal>();
+            var worked   = (dashboard.WorkedHoursSeries ?? new List<int>()).Select(x => (decimal)x).ToList();
 
             await JS.InvokeVoidAsync(
                 "renderWeeklyChart",
                 labels.ToArray(),
                 actual.ToArray(),
-                invoiced.ToArray()
+                invoiced.ToArray(),
+                worked.ToArray()
             );
 
-            // prepare per‑project mini charts (id, labels, actual)
+            // prepare per‑project mini charts (id, labels, actual, worked)
             var projectCharts = (dashboard.WeeklyDataByProject ?? new Dictionary<Guid, List<WeeklyChartDataDto>>())
                 .Select(kvp => new
                 {
                     id = $"pc-{kvp.Key:N}",
                     labels = (kvp.Value ?? new List<WeeklyChartDataDto>()).Select(v => v.WeekLabel).ToArray(),
-                    actual = (kvp.Value ?? new List<WeeklyChartDataDto>()).Select(v => v.Actual).ToArray()
+                    actual = (kvp.Value ?? new List<WeeklyChartDataDto>()).Select(v => v.Actual).ToArray(),
+                    worked = (kvp.Value ?? new List<WeeklyChartDataDto>()).Select(v => v.WorkedHours).ToArray()
                 })
                 .ToList();
 
