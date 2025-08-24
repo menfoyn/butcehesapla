@@ -21,6 +21,5 @@ public class CreateExpenseReportDto
     [MinLength(1, ErrorMessage = "En az bir masraf kalemi girilmelidir.")]
     public List<CreateExpenseItemDto> Items { get; set; } = new();
 
-    [Required(ErrorMessage = "Kullanıcı bilgisi eksik.")]
     public Guid OwnerId { get; set; }
 }

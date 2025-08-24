@@ -4,8 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using ExpenseTracker.ExpenseReports;
 using ExpenseTracker.ExpenseReports.Services;
+using ExpenseTracker.Projects;                     // ← proje adı için
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Application.Services;
+using Volo.Abp.Domain.Repositories;               // ← Project repo için
 using Volo.Abp.Users;
 using Volo.Abp.MultiTenancy;
 
@@ -15,11 +17,38 @@ namespace ExpenseTracker.ExpenseReports.Services
     {
         private readonly IExpenseReportRepository _expenseReportRepository;
 
-        public ExpenseReportAppService(IExpenseReportRepository expenseReportRepository)
+        // ↓↓↓ EKLENEN BAĞIMLILIKLAR ↓↓↓
+        private readonly ICategoryRepository _categoryRepository;
+        private readonly IRepository<Project, Guid> _projectRepository;
+
+        public ExpenseReportAppService(
+            IExpenseReportRepository expenseReportRepository,
+            ICategoryRepository categoryRepository,                // ← ek
+            IRepository<Project, Guid> projectRepository)          // ← ek
         {
             _expenseReportRepository = expenseReportRepository;
+            _categoryRepository = categoryRepository;
+            _projectRepository = projectRepository;
         }
 
+        // UI sadece kategori ADI göndermişse ID’yi çöz
+        private async Task<Guid> ResolveCategoryIdAsync(string? categoryName)
+        {
+            if (string.IsNullOrWhiteSpace(categoryName))
+                return Guid.Empty;
+
+            var existing = await _categoryRepository.FindByNameAsync(categoryName.Trim());
+            if (existing != null)
+                return existing.Id;
+
+            // Id'yi ctor üzerinden veriyoruz
+            var created = new Category(GuidGenerator.Create())
+            {
+                Name = categoryName.Trim()
+            };
+            await _categoryRepository.InsertAsync(created, autoSave: true);
+            return created.Id;
+        }
         public async Task<ExpenseReportDto> CreateAsync(CreateExpenseReportDto input)
         {
             var expenseReport = new ExpenseReport(
@@ -39,12 +68,17 @@ namespace ExpenseTracker.ExpenseReports.Services
             {
                 foreach (var i in input.Items)
                 {
+                    // Eğer CategoryId boş ve Category adı doluysa ID’yi çöz
+                    var categoryId = i.CategoryId;
+                    if (categoryId == Guid.Empty && !string.IsNullOrWhiteSpace(i.Category))
+                        categoryId = await ResolveCategoryIdAsync(i.Category);
+
                     var item = new ExpenseItem
                     {
                         Date = i.Date == default ? DateTime.Now : i.Date,
                         Amount = i.Amount,
                         Description = i.Description,
-                        CategoryId = i.CategoryId,
+                        CategoryId = categoryId, // ← kritik
                         Currency = string.IsNullOrWhiteSpace(i.Currency) ? "TRY" : i.Currency,
                         WorkedHours = i.WorkedHours,
                         Name = i.Name,
@@ -84,8 +118,43 @@ namespace ExpenseTracker.ExpenseReports.Services
 
         public async Task<ExpenseReportDto> GetAsync(Guid id)
         {
-            var expenseReport = await _expenseReportRepository.GetAsync(id);
-            return ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(expenseReport);
+            var entity = await _expenseReportRepository.GetAsync(id);
+            var dto = ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(entity);
+
+            // Proje adını doldur
+            if (dto != null && dto.ProjectId != Guid.Empty)
+            {
+                var proj = await _projectRepository.FindAsync(dto.ProjectId);
+                if (proj != null) dto.ProjectName = proj.Name;
+            }
+
+            // Kategori adlarını doldur
+            if (entity?.Items != null && entity.Items.Count > 0 && dto?.Items != null)
+            {
+                var catIds = entity.Items
+                    .Select(i => i.CategoryId)
+                    .Where(x => x != Guid.Empty)
+                    .Distinct()
+                    .ToList();
+
+                var catDict = new Dictionary<Guid, string>();
+                if (catIds.Count > 0)
+                {
+                    // Basit yol: tüm kategorileri çekip filtrele
+                    // (İstersen özel bir repo metodu ile IN (...) çekebilirsin)
+                    var allCats = await _categoryRepository.GetListAsync();
+                    foreach (var c in allCats.Where(c => catIds.Contains(c.Id)))
+                        catDict[c.Id] = c.Name;
+                }
+
+                foreach (var itemDto in dto.Items)
+                {
+                    if (itemDto.CategoryId != Guid.Empty && catDict.TryGetValue(itemDto.CategoryId, out var name))
+                        itemDto.Category = name;
+                }
+            }
+
+            return dto;
         }
 
         public async Task<List<ExpenseReportDto>> GetListAsync()

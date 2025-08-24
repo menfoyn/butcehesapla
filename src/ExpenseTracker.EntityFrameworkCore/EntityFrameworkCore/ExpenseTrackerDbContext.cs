@@ -125,6 +125,18 @@ public class ExpenseTrackerDbContext :
             b.Property(x => x.Currency).HasMaxLength(8);
             b.Property(x => x.Name).HasMaxLength(128);
             b.Property(x => x.Description).HasMaxLength(1024);
+
+            // 🔗 Category FK (Kategori zorunlu olsun istiyorsan alttaki satırı aç)
+            // b.Property(x => x.CategoryId).IsRequired();
+
+            b.HasOne<Category>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict); // kategori silinince item’lar bozulmasın
+
+            // ⚡ Performans için indexler
+            b.HasIndex(x => x.CategoryId);
+            b.HasIndex(x => x.ExpenseReportId);
         });
 
         builder.Entity<Category>(b =>
