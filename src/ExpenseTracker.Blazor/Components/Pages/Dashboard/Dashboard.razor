@@ -221,9 +221,39 @@ else
         const data = {
             labels: labels,
             datasets: [
-                { label: 'Gerçekleşen', data: actual, fill: false, tension: 0.3 },
-                { label: 'Faturalanan', data: invoiced, fill: false, tension: 0.3 },
-                { label: 'Çalışılan Saat', data: worked, fill: false, tension: 0.3 }
+                {
+                    label: 'Gerçekleşen',
+                    data: actual,
+                    fill: false,
+                    tension: 0.3,
+                    borderColor: '#59a14f',
+                    backgroundColor: '#59a14f',
+                    pointBackgroundColor: '#59a14f',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4
+                },
+                {
+                    label: 'Faturalanan',
+                    data: invoiced,
+                    fill: false,
+                    tension: 0.3,
+                    borderColor: '#4e79a7',
+                    backgroundColor: '#4e79a7',
+                    pointBackgroundColor: '#4e79a7',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4
+                },
+                {
+                    label: 'Çalışılan Saat',
+                    data: worked,
+                    fill: false,
+                    tension: 0.3,
+                    borderColor: '#f28e2b',
+                    backgroundColor: '#f28e2b',
+                    pointBackgroundColor: '#f28e2b',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4
+                }
             ]
         };
         const cfg = {
@@ -265,8 +295,28 @@ else
             const data = {
                 labels: it.labels,
                 datasets: [
-                    { label: 'Harcanan', data: it.actual, fill: false, tension: 0.3 },
-                    { label: 'Çalışılan Saat', data: it.worked, fill: false, tension: 0.3 }
+                    {
+                        label: 'Harcanan',
+                        data: it.actual,
+                        fill: false,
+                        tension: 0.3,
+                        borderColor: '#4e79a7',
+                        backgroundColor: '#4e79a7',
+                        pointBackgroundColor: '#4e79a7',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4
+                    },
+                    {
+                        label: 'Çalışılan Saat',
+                        data: it.worked,
+                        fill: false,
+                        tension: 0.3,
+                        borderColor: '#f28e2b',
+                        backgroundColor: '#f28e2b',
+                        pointBackgroundColor: '#f28e2b',
+                        pointBorderColor: '#fff',
+                        pointRadius: 4
+                    }
                 ]
             };
             const cfg = { type: 'line', data: data, options: { responsive: true, plugins: { legend: { display: true } } } };
