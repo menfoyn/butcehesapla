@@ -14,6 +14,7 @@ using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp;
+using Volo.Abp.Identity;
 
 namespace ExpenseTracker.ExpenseReports.Services
 {
@@ -25,15 +26,18 @@ namespace ExpenseTracker.ExpenseReports.Services
         // ↓↓↓ EKLENEN BAĞIMLILIKLAR ↓↓↓
         private readonly ICategoryRepository _categoryRepository;
         private readonly IRepository<Project, Guid> _projectRepository;
+        private readonly IIdentityUserRepository _userRepository;
 
         public ExpenseReportAppService(
             IExpenseReportRepository expenseReportRepository,
             ICategoryRepository categoryRepository,
-            IRepository<Project, Guid> projectRepository)
+            IRepository<Project, Guid> projectRepository,
+            IIdentityUserRepository userRepository)
         {
             _expenseReportRepository = expenseReportRepository;
             _categoryRepository = categoryRepository;
             _projectRepository = projectRepository;
+            _userRepository = userRepository;
         }
 
         // UI sadece kategori ADI göndermişse ID’yi çöz
@@ -139,10 +143,10 @@ namespace ExpenseTracker.ExpenseReports.Services
         public async Task<ExpenseReportDto> GetAsync(Guid id)
         {
             var entity = await _expenseReportRepository.GetAsync(id);
-            // Permission/ownership check: allow all if user has ViewAll; otherwise only owner can view
+            var currentUserId = CurrentUser.Id;
             if (!await AuthorizationService.IsGrantedAsync(ExpenseTrackerPermissions.ExpenseReports.ViewAll))
             {
-                if (entity.OwnerId != CurrentUser.Id)
+                if (!currentUserId.HasValue || entity.OwnerId != currentUserId.Value)
                 {
                     throw new AbpAuthorizationException("You are not allowed to view this expense report.");
                 }
@@ -177,6 +181,18 @@ namespace ExpenseTracker.ExpenseReports.Services
                 {
                     if (itemDto.CategoryId != Guid.Empty && catDict.TryGetValue(itemDto.CategoryId, out var name))
                         itemDto.Category = name;
+                }
+            }
+
+            // OwnerName doldur
+            if (dto != null && entity != null)
+            {
+                var ownerId = entity.OwnerId;
+                var owner = await _userRepository.FindAsync(ownerId);
+                if (owner != null)
+                {
+                    var displayName = string.IsNullOrWhiteSpace(owner.Name) ? owner.UserName : owner.Name;
+                    try { dto.OwnerName = displayName; } catch { /* OwnerName alanı yoksa yoksay */ }
                 }
             }
 
@@ -247,7 +263,31 @@ namespace ExpenseTracker.ExpenseReports.Services
             var filtered = query.ToList();
 
             Logger.LogInformation("[ExpenseReport] GetList filtered. Total={Total}, AfterFilter={After}", reports?.Count ?? -1, filtered.Count);
-            return filtered.Select(r => ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(r)).ToList();
+
+            // Owner adlarını doldurmak için kullanıcıları çek
+            var ownerIds = filtered.Select(r => r.OwnerId).Distinct().ToList();
+            var nameDict = new Dictionary<Guid, string>();
+            foreach (var oid in ownerIds)
+            {
+                var user = await _userRepository.FindAsync(oid);
+                if (user != null)
+                {
+                    nameDict[oid] = string.IsNullOrWhiteSpace(user.Name) ? user.UserName : user.Name;
+                }
+            }
+
+            var result = new List<ExpenseReportDto>(filtered.Count);
+            foreach (var r in filtered)
+            {
+                var dto = ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(r);
+                if (nameDict.TryGetValue(r.OwnerId, out var nm))
+                {
+                    try { dto.OwnerName = nm; } catch { /* OwnerName yoksa yoksay */ }
+                }
+                result.Add(dto);
+            }
+
+            return result;
         }
 
         [Authorize(ExpenseTrackerPermissions.ExpenseReports.Approve)]

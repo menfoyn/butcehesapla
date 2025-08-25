@@ -62,6 +62,10 @@ else
                             </div>
                         }
                         <div class="subtle text-truncate">@(!string.IsNullOrWhiteSpace(report.Title) ? report.Title : "(Başlıksız)")</div>
+                        @if (_ownerNameById.TryGetValue(report.Id, out var ownerName) && !string.IsNullOrWhiteSpace(ownerName))
+                        {
+                            <div class="subtle">👤 @ownerName</div>
+                        }
                     </td>
                     <td class="text-end">@Currency(report.TotalAmount, null)</td>
                     <td>
@@ -165,7 +169,8 @@ else
                 (r.Title?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false) ||
                 (r.ProjectName?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false) ||
                 (r.Status?.Contains(search, StringComparison.CurrentCultureIgnoreCase) ?? false) ||
-                (_displayNameById.TryGetValue(r.Id, out var dn) && dn.Contains(search, StringComparison.CurrentCultureIgnoreCase))
+                (_displayNameById.TryGetValue(r.Id, out var dn) && dn.Contains(search, StringComparison.CurrentCultureIgnoreCase)) ||
+                (_ownerNameById.TryGetValue(r.Id, out var on) && on.Contains(search, StringComparison.CurrentCultureIgnoreCase))
             );
 
     private List<ExpenseReportDto> reports = new();
@@ -177,9 +182,11 @@ else
     private readonly Dictionary<Guid, List<string>> _categoriesById = new();
     // ProjectId -> Project Name (for quick lookup)
     private readonly Dictionary<Guid, string> _projectNameById = new();
+    // ReportId -> Owner display name (report submitter)
+    private readonly Dictionary<Guid, string> _ownerNameById = new();
 
     protected override async Task OnInitializedAsync()
-    {
+    { 
         var approve = await SafeIsGrantedAsync(ExpenseTrackerPermissions.ExpenseReports.Approve);
         var reject  = await SafeIsGrantedAsync(ExpenseTrackerPermissions.ExpenseReports.Reject);
         canModerate = approve || reject;
@@ -241,6 +248,7 @@ else
             reports = new List<ExpenseReportDto>();
             _displayNameById.Clear();
             _categoriesById.Clear();
+            _ownerNameById.Clear();
         }
         finally
         {
@@ -252,6 +260,7 @@ else
     {
         _displayNameById.Clear();
         _categoriesById.Clear();
+        _ownerNameById.Clear();
 
         foreach (var r in reports)
         {
@@ -295,11 +304,20 @@ else
                     .ToList() ?? new List<string>();
 
                 _categoriesById[r.Id] = cats;
+
+                // Owner (report submitter) display name
+                var owner = full?.OwnerName;
+                if (string.IsNullOrWhiteSpace(owner))
+                {
+                    owner = full?.OwnerUserName; // fallback if available in DTO
+                }
+                _ownerNameById[r.Id] = string.IsNullOrWhiteSpace(owner) ? string.Empty : owner.Trim();
             }
             catch
             {
                 _displayNameById[r.Id] = "(PROJE YOK)";
                 _categoriesById[r.Id] = new List<string>();
+                _ownerNameById[r.Id] = string.Empty;
             }
         }
     }

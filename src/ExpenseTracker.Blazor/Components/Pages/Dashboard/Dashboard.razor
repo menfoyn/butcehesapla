@@ -4,12 +4,31 @@
 @using ExpenseTracker.Dashboard
 @using ExpenseTracker.ExpenseReports
 @using System.Linq
+@using ExpenseTracker.Permissions
+@using Microsoft.AspNetCore.Authorization
+@using Volo.Abp.Identity
 @inject IDashboardAppService DashboardAppService
 @inject IJSRuntime JS
+@inject IAuthorizationService AuthorizationService
+@inject IIdentityUserAppService IdentityUserAppService
 
 <!-- Dashboard page: shows summary cards, a weekly chart, and a fallback table -->
 
 <h3 class="mb-3">Gösterge Paneli</h3>
+
+@if (_canViewAll)
+{
+    <div class="d-flex align-items-center gap-2 mb-3">
+        <label class="form-label mb-0">Kullanıcı:</label>
+        <select class="form-select" style="max-width: 280px" @onchange="OnUserChanged">
+            <option value="">(Tümü)</option>
+            @foreach (var u in _users)
+            {
+                <option value="@u.Id" selected="@(_selectedUserId == u.Id)">@u.UserName (@u.Email)</option>
+            }
+        </select>
+    </div>
+}
 
 @if (dashboard == null)
 {
@@ -50,7 +69,7 @@ else
     <div class="card shadow-sm p-3 mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h5 class="mb-0">Kategori Dağılımı</h5>
-            @if ((_visibleCategories.Count) > 0)
+            @if (_visibleCategories.Count > 0)
             {
                 var totalCat = _visibleCategories.Sum(x => x.Amount);
                 <span class="text-muted small">Toplam: ₺@totalCat.ToString("N2")</span>
@@ -379,12 +398,41 @@ else
 </script>
 
 @code {
+    private bool _canViewAll;
+    private Guid? _selectedUserId;
+    private List<IdentityUserDto> _users = new();
     private DashboardDto? dashboard;
     private bool _chartRendered;
 
     protected override async Task OnInitializedAsync()
     {
-        dashboard = await DashboardAppService.GetDashboardDataAsync();
+        _canViewAll = await AuthorizationService.IsGrantedAsync(ExpenseTrackerPermissions.Dashboard.ViewAll);
+        if (_canViewAll)
+        {
+            // Load a lightweight page of users (adjust PageSize as you wish)
+            var input = new GetIdentityUsersInput { MaxResultCount = 1000 };
+            var list = await IdentityUserAppService.GetListAsync(input);
+            _users = list.Items.ToList();
+        }
+
+        // if admin selected a specific user, ask backend for that user's dashboard; otherwise null => all / current
+        var uid = _canViewAll ? _selectedUserId : null;
+        dashboard = await DashboardAppService.GetDashboardDataAsync(uid);
+    }
+
+    private async Task OnUserChanged(ChangeEventArgs e)
+    {
+        var value = e?.Value?.ToString();
+        _selectedUserId = Guid.TryParse(value, out var gid) ? gid : null;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _chartRendered = false; // force chart re-render
+        var uid = _canViewAll ? _selectedUserId : null;
+        dashboard = await DashboardAppService.GetDashboardDataAsync(uid);
+        StateHasChanged();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

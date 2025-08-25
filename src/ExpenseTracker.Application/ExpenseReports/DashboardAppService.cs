@@ -33,23 +33,24 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
         _categoryRepo = categoryRepo;
     }
 
-    public async Task<DashboardDto> GetDashboardDataAsync()
+    public async Task<DashboardDto> GetDashboardDataAsync(Guid? uid)
     {
-        return await GetDashboardDataAsync(null, null, null);
+        return await GetDashboardDataCoreAsync(uid, null, null, null);
     }
 
-    public async Task<DashboardDto> GetDashboardDataAsync(Guid? projectId, DateTime? dateFrom, DateTime? dateTo)
+    private async Task<DashboardDto> GetDashboardDataCoreAsync(Guid? selectedUserId, Guid? projectId, DateTime? dateFrom, DateTime? dateTo)
     {
         var reportQ  = await _reportRepo.GetQueryableAsync();
         var itemQ    = await _itemRepo.GetQueryableAsync();
         var projQ    = await _projectRepo.GetQueryableAsync();
 
-        // Authorization-based filtering: non-admins see only their own reports
+        // Who can we see?
         var canViewAll = await AuthorizationService.IsGrantedAsync(ExpenseTrackerPermissions.Dashboard.ViewAll);
-        if (!canViewAll)
+        Guid? effectiveUserId = canViewAll ? selectedUserId : CurrentUser.Id;
+        if (effectiveUserId.HasValue)
         {
-            var currentUserId = CurrentUser.GetId();
-            reportQ = reportQ.Where(r => r.OwnerId == currentUserId);
+            var uid = effectiveUserId.Value;
+            reportQ = reportQ.Where(r => r.OwnerId == uid); // or r.CreatorId == uid if your model uses CreatorId
         }
 
         // Only show APPROVED reports on the dashboard (hide Pending/Rejected)
@@ -80,7 +81,7 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             from p in gp.DefaultIfEmpty()
             select new
             {
-                ProjectId    = r.ProjectId,            // Guid
+                ProjectId    = r.ProjectId,
                 ProjectName  = p != null ? p.Name : null,
                 ItemDate     = i.Date,
                 ItemAmount   = i.Amount,
@@ -88,9 +89,9 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
                 CategoryId   = i.CategoryId
             };
 
+        // ----- The rest of the method remains the same -----
         var rows = await AsyncExecuter.ToListAsync(projectedQuery);
 
-        // Aggregate budgets per project from reports (distinct from items)
         var reportLimits = await AsyncExecuter.ToListAsync(
             from r in reportQ
             group r by r.ProjectId into g
@@ -98,12 +99,10 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
         );
         var budgetByProject = reportLimits.ToDictionary(x => x.ProjectId, x => x.TotalLimit);
 
-        // ---- Overall totals ----
         var totalInvoiced = rows.Sum(x => x.ItemAmount);
         var totalBudget   = reportLimits.Sum(x => x.TotalLimit);
         var totalHoursDec = rows.Sum(x => x.ItemHours);
 
-        // ---- Weekly totals (last 8 weeks) ----
         var start = DateTime.UtcNow.Date.AddDays(-7 * 7);
         var weeklyDict = new Dictionary<string, (decimal actual, decimal invoiced, decimal hours)>();
 
@@ -130,7 +129,6 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             })
             .ToList();
 
-        // ---- Project cards ----
         var UNASSIGNED = Guid.Empty;
         var projectAgg = new Dictionary<Guid, (decimal amount, string? name, decimal hours)>();
 
@@ -140,7 +138,7 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             if (!projectAgg.TryGetValue(pid, out var agg)) agg = (0m, null, 0m);
             agg.amount += x.ItemAmount;
             agg.hours  += x.ItemHours;
-            if (string.IsNullOrWhiteSpace(agg.name)) agg.name = x.ProjectName; // first non-empty name wins
+            if (string.IsNullOrWhiteSpace(agg.name)) agg.name = x.ProjectName;
             projectAgg[pid] = agg;
         }
 
@@ -159,7 +157,6 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             })
             .ToList();
 
-        // ---- Category breakdown (all items) ----
         var catTotals = rows
             .GroupBy(x => x.CategoryId)
             .Select(g => new { CategoryId = g.Key, Amount = g.Sum(z => z.ItemAmount) })
@@ -178,13 +175,10 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             })
             .ToList();
 
-        // ---- Series for the summary chart ----
         var weekLabels     = weeklyList.Select(w => w.WeekLabel).ToList();
         var actualSeries   = weeklyList.Select(w => w.Actual).ToList();
         var invoicedSeries = weeklyList.Select(w => w.Invoiced).ToList();
-        var workedSeries   = weeklyList.Select(w => w.WorkedHours).ToList();
 
-        // ---- Per‑project weekly breakdown ----
         var perProjectTmp = new Dictionary<Guid, Dictionary<string, (decimal actual, decimal invoiced, decimal hours)>>();
 
         foreach (var x in rows)

@@ -7,6 +7,8 @@ public class ExpenseReportDto
 {
     public Guid Id { get; set; }
     public Guid OwnerId { get; set; }
+    public string? OwnerName { get; set; }
+
     public Guid ProjectId { get; set; }
     public decimal SpendingLimit { get; set; }
     public decimal TotalAmount { get; set; }
@@ -16,4 +18,5 @@ public class ExpenseReportDto
     public List<ExpenseItemDto> Items { get; set; } = new();
     public string? ReceiptFilePath { get; set; }
     public string? ProjectName { get; set; }
+    public string? OwnerUserName { get; set; }
 }
