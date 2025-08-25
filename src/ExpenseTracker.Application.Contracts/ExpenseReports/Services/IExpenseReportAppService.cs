@@ -15,4 +15,10 @@ public interface IExpenseReportAppService : IApplicationService
     Task<ExpenseReportDto> CreateAsync(CreateExpenseReportDto input);
     Task DeleteAsync(Guid id);
     
+    // Admin onay/red işlemleri
+    Task<ExpenseReportDto> ApproveAsync(Guid id);
+    Task<ExpenseReportDto> RejectAsync(Guid id, string? reason = null);
+
+    // Bekleyen raporlar (Admin için)
+    Task<List<ExpenseReportDto>> GetPendingAsync();
 }

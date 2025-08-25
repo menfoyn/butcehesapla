@@ -23,8 +23,13 @@ namespace ExpenseTracker.ExpenseReports
 
         public ExpenseReport(Guid projectId, decimal spendingLimit, DateTime createdAt, string? receiptFilePath)
         {
-            throw new NotImplementedException();
-        }
+            ProjectId = projectId;
+            SpendingLimit = spendingLimit;
+            CreatedAt = createdAt;
+            ReceiptFilePath = receiptFilePath;
+
+            Status = ExpenseReportStatus.Pending; // varsayılan
+            Items = new List<ExpenseItem>();           }
 
         public string Title { get; set; } = string.Empty;
         public Guid ProjectId { get; set; }
@@ -41,4 +46,10 @@ namespace ExpenseTracker.ExpenseReports
 
         public void AddItem(ExpenseItem item) => Items.Add(item);
     }
+
+    public static class ExpenseReportStatus
+    {
+        public const string Pending  = "Pending";
+        public const string Approved = "Approved";
+        public const string Rejected = "Rejected";    }
 }

@@ -13,6 +13,7 @@ using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 using Volo.Abp.MultiTenancy;
+using Volo.Abp;
 
 namespace ExpenseTracker.ExpenseReports.Services
 {
@@ -247,6 +248,58 @@ namespace ExpenseTracker.ExpenseReports.Services
 
             Logger.LogInformation("[ExpenseReport] GetList filtered. Total={Total}, AfterFilter={After}", reports?.Count ?? -1, filtered.Count);
             return filtered.Select(r => ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(r)).ToList();
+        }
+
+        [Authorize(ExpenseTrackerPermissions.ExpenseReports.Approve)]
+        public async Task<ExpenseReportDto> ApproveAsync(Guid id)
+        {
+            Logger.LogInformation("[ExpenseReport] Approve requested. Id={Id}, By={User}", id, CurrentUser?.Id);
+
+            var report = await _expenseReportRepository.GetAsync(id);
+
+            if (string.Equals(report.Status, "Approved", StringComparison.OrdinalIgnoreCase))
+            {
+                return ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(report);
+            }
+
+            report.Status = "Approved";
+            await _expenseReportRepository.UpdateAsync(report, autoSave: true);
+            await CurrentUnitOfWork.SaveChangesAsync();
+
+            Logger.LogInformation("[ExpenseReport] Approved. Id={Id}", id);
+            return ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(report);
+        }
+
+        [Authorize(ExpenseTrackerPermissions.ExpenseReports.Approve)]
+        public async Task<ExpenseReportDto> RejectAsync(Guid id, string? reason = null)
+        {
+            Logger.LogInformation("[ExpenseReport] Reject requested. Id={Id}, By={User}", id, CurrentUser?.Id);
+
+            var report = await _expenseReportRepository.GetAsync(id);
+
+            if (string.Equals(report.Status, "Rejected", StringComparison.OrdinalIgnoreCase))
+            {
+                return ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(report);
+            }
+
+            report.Status = "Rejected";
+            // İleride entity'ye RejectionReason eklersen burada set edebilirsin.
+            await _expenseReportRepository.UpdateAsync(report, autoSave: true);
+            await CurrentUnitOfWork.SaveChangesAsync();
+
+            Logger.LogInformation("[ExpenseReport] Rejected. Id={Id} Reason={Reason}", id, reason);
+            return ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(report);
+        }
+
+        [Authorize(ExpenseTrackerPermissions.ExpenseReports.Approve)]
+        public async Task<List<ExpenseReportDto>> GetPendingAsync()
+        {
+            var reports = await _expenseReportRepository.GetListAsync();
+            var pending = reports
+                .Where(r => string.Equals(r.Status, "Pending", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            return pending.Select(r => ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(r)).ToList();
         }
     }
 }

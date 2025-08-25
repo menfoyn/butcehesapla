@@ -1,4 +1,5 @@
 @page "/dashboard"
+@using System
 @using System.Text.Json
 @using ExpenseTracker.Dashboard
 @using ExpenseTracker.ExpenseReports
@@ -49,14 +50,14 @@ else
     <div class="card shadow-sm p-3 mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h5 class="mb-0">Kategori Dağılımı</h5>
-            @if ((dashboard?.CategoryBreakdown?.Count ?? 0) > 0)
+            @if ((_visibleCategories.Count) > 0)
             {
-                var totalCat = dashboard!.CategoryBreakdown!.Sum(x => x.Amount);
+                var totalCat = _visibleCategories.Sum(x => x.Amount);
                 <span class="text-muted small">Toplam: ₺@totalCat.ToString("N2")</span>
             }
         </div>
 
-        @if ((dashboard?.CategoryBreakdown?.Count ?? 0) == 0)
+        @if ((_visibleCategories.Count) == 0)
         {
             <div class="text-muted">Kategori verisi bulunamadı.</div>
         }
@@ -68,7 +69,7 @@ else
                 </div>
                 <div class="col-md-5">
                     <ul class="list-group list-group-flush">
-                        @foreach (var c in dashboard!.CategoryBreakdown!)
+                        @foreach (var c in _visibleCategories)
                         {
                             var pct = c.Percent;
                             <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -94,7 +95,7 @@ else
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var c in dashboard!.CategoryBreakdown!)
+                        @foreach (var c in _visibleCategories)
                         {
                             <tr>
                                 <td>@c.Name</td>
@@ -418,8 +419,9 @@ else
             await JS.InvokeVoidAsync("renderProjectCharts", projectCharts);
 
             // category chart
-            var catLabels = (dashboard.CategoryBreakdown ?? new List<DashboardDto.CategoryBreakdownDto>()).Select(x => x.Name).ToArray();
-            var catValues = (dashboard.CategoryBreakdown ?? new List<DashboardDto.CategoryBreakdownDto>()).Select(x => x.Amount).ToArray();
+            var cats = _visibleCategories;
+            var catLabels = cats.Select(x => x.Name).ToArray();
+            var catValues = cats.Select(x => x.Amount).ToArray();
             if (catLabels.Length > 0)
             {
                 await JS.InvokeVoidAsync("renderCategoryChart", catLabels, catValues);
@@ -427,6 +429,28 @@ else
 
             _chartRendered = true;
         }
+    }
+
+    // Defensive UI-side filter for rejected categories (works whether Status is string or enum, and is safe if property doesn't exist)
+    private IReadOnlyList<DashboardDto.CategoryBreakdownDto> _visibleCategories
+        => (dashboard?.CategoryBreakdown ?? new List<DashboardDto.CategoryBreakdownDto>())
+            .Where(x => !IsRejected(x))
+            .ToList();
+
+    private static bool IsRejected(object? item)
+    {
+        if (item is null) return false;
+
+        // Try to read a property named "Status" (string or enum)
+        var prop = item.GetType().GetProperty("Status");
+        if (prop is null) return false;
+
+        var value = prop.GetValue(item);
+        if (value is null) return false;
+
+        // Works for string or enum
+        var text = value.ToString();
+        return text != null && text.Equals("Rejected", StringComparison.OrdinalIgnoreCase);
     }
 }
 

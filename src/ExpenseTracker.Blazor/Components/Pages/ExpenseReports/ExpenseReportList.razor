@@ -6,7 +6,9 @@
 @inject IExpenseReportAppService ExpenseReportAppService
 @inject IProjectAppService ProjectAppService
 @inject NavigationManager NavigationManager
+@inject IAuthorizationService AuthorizationService
 @using System.Linq
+@using ExpenseTracker.Permissions
 
 <div class="page-toolbar">
     <div class="left">
@@ -63,7 +65,16 @@ else
                     </td>
                     <td class="text-end">@Currency(report.TotalAmount, null)</td>
                     <td>
-                        <span class="badge @StatusBadge(report.Status)">@report.Status</span>
+                        <div>
+                            <span class="badge @StatusBadge(report.Status)">@report.Status</span>
+                        </div>
+                        @if (canModerate && string.Equals(report?.Status, "Pending", StringComparison.InvariantCultureIgnoreCase))
+                        {
+                            <div class="mt-1 d-flex gap-1 justify-content-start">
+                                <button class="btn btn-success btn-sm" title="Onayla" @onclick="() => ApproveReport(report.Id)">Onayla</button>
+                                <button class="btn btn-warning btn-sm" title="Reddet" @onclick="() => RejectReport(report.Id)">Reddet</button>
+                            </div>
+                        }
                     </td>
                     <td class="text-end">
                         <div class="btn-group btn-group-sm" role="group">
@@ -159,6 +170,7 @@ else
 
     private List<ExpenseReportDto> reports = new();
     private bool isLoading = true;
+    private bool canModerate;
     // ReportId -> Resolved display label (Category or ProjectName)
     private readonly Dictionary<Guid, string> _displayNameById = new();
     // ReportId -> Distinct categories in the report (for visual badges)
@@ -168,8 +180,27 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var approve = await SafeIsGrantedAsync(ExpenseTrackerPermissions.ExpenseReports.Approve);
+        var reject  = await SafeIsGrantedAsync(ExpenseTrackerPermissions.ExpenseReports.Reject);
+        canModerate = approve || reject;
         await LoadProjectsAsync();
         await LoadReportsAsync();
+    }
+
+    private async Task<bool> SafeIsGrantedAsync(string? permission)
+    {
+        if (string.IsNullOrWhiteSpace(permission))
+        {
+            return false;
+        }
+        try
+        {
+            return await AuthorizationService.IsGrantedAsync(permission);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private async Task LoadProjectsAsync()
@@ -287,6 +318,32 @@ else
         catch (Exception ex)
         {
             Console.WriteLine($"Error deleting report: {ex.Message}");
+        }
+    }
+
+    private async Task ApproveReport(Guid id)
+    {
+        try
+        {
+            await ExpenseReportAppService.ApproveAsync(id);
+            await LoadReportsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error approving report: {ex.Message}");
+        }
+    }
+
+    private async Task RejectReport(Guid id)
+    {
+        try
+        {
+            await ExpenseReportAppService.RejectAsync(id);
+            await LoadReportsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error rejecting report: {ex.Message}");
         }
     }
 

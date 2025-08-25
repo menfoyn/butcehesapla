@@ -52,6 +52,9 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             reportQ = reportQ.Where(r => r.OwnerId == currentUserId);
         }
 
+        // Only show APPROVED reports on the dashboard (hide Pending/Rejected)
+        reportQ = reportQ.Where(r => r.Status == ExpenseReportStatus.Approved);
+
         // Apply explicit filters if provided
         if (projectId.HasValue && projectId.Value != Guid.Empty)
         {

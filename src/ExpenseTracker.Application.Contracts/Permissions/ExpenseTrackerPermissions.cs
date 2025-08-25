@@ -11,6 +11,7 @@ public static class ExpenseTrackerPermissions
         public const string Delete  = Default + ".Delete";             // Silme (kendi kaydı)
         public const string ViewAll = Default + ".ViewAll";            // Tüm kayıtları görme (admin/manager)
         public const string Approve = Default + ".Approve";            // Onay/Red verme
+        public static string Reject { get; set; }
     }
 
     public static class Dashboard
