@@ -4,10 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using ExpenseTracker.ExpenseReports;
 using ExpenseTracker.ExpenseReports.Services;
-using ExpenseTracker.Projects;                     // ← proje adı için
+using ExpenseTracker.Projects;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Application.Services;
-using Volo.Abp.Domain.Repositories;               // ← Project repo için
+using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 using Volo.Abp.MultiTenancy;
 
@@ -23,8 +23,8 @@ namespace ExpenseTracker.ExpenseReports.Services
 
         public ExpenseReportAppService(
             IExpenseReportRepository expenseReportRepository,
-            ICategoryRepository categoryRepository,                // ← ek
-            IRepository<Project, Guid> projectRepository)          // ← ek
+            ICategoryRepository categoryRepository,
+            IRepository<Project, Guid> projectRepository)
         {
             _expenseReportRepository = expenseReportRepository;
             _categoryRepository = categoryRepository;
@@ -78,7 +78,7 @@ namespace ExpenseTracker.ExpenseReports.Services
                         Date = i.Date == default ? DateTime.Now : i.Date,
                         Amount = i.Amount,
                         Description = i.Description,
-                        CategoryId = categoryId, // ← kritik
+                        CategoryId = categoryId,
                         Currency = string.IsNullOrWhiteSpace(i.Currency) ? "TRY" : i.Currency,
                         WorkedHours = i.WorkedHours,
                         Name = i.Name,
@@ -140,8 +140,6 @@ namespace ExpenseTracker.ExpenseReports.Services
                 var catDict = new Dictionary<Guid, string>();
                 if (catIds.Count > 0)
                 {
-                    // Basit yol: tüm kategorileri çekip filtrele
-                    // (İstersen özel bir repo metodu ile IN (...) çekebilirsin)
                     var allCats = await _categoryRepository.GetListAsync();
                     foreach (var c in allCats.Where(c => catIds.Contains(c.Id)))
                         catDict[c.Id] = c.Name;

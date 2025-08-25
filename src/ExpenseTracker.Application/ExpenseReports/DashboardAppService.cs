@@ -15,15 +15,18 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
     private readonly IRepository<ExpenseReport, Guid> _reportRepo;
     private readonly IRepository<ExpenseItem, Guid> _itemRepo;
     private readonly IRepository<Project, Guid> _projectRepo;
+    private readonly IRepository<Category, Guid> _categoryRepo;
 
     public DashboardAppService(
         IRepository<ExpenseReport, Guid> reportRepo,
         IRepository<ExpenseItem, Guid> itemRepo,
-        IRepository<Project, Guid> projectRepo)
+        IRepository<Project, Guid> projectRepo,
+        IRepository<Category, Guid> categoryRepo)
     {
         _reportRepo = reportRepo;
         _itemRepo = itemRepo;
         _projectRepo = projectRepo;
+        _categoryRepo = categoryRepo;
     }
 
     public async Task<DashboardDto> GetDashboardDataAsync()
@@ -44,7 +47,8 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
                 ProjectName  = p != null ? p.Name : null,
                 ItemDate     = i.Date,
                 ItemAmount   = i.Amount,
-                ItemHours    = i.WorkedHours
+                ItemHours    = i.WorkedHours,
+                CategoryId   = i.CategoryId
             };
 
         var rows = await AsyncExecuter.ToListAsync(projectedQuery);
@@ -118,6 +122,25 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             })
             .ToList();
 
+        // ---- Category breakdown (all items) ----
+        var catTotals = rows
+            .GroupBy(x => x.CategoryId)
+            .Select(g => new { CategoryId = g.Key, Amount = g.Sum(z => z.ItemAmount) })
+            .ToList();
+
+        var categories = await _categoryRepo.GetListAsync();
+        var nameById = categories.ToDictionary(c => c.Id, c => c.Name);
+        var totalCatAmount = catTotals.Sum(x => x.Amount);
+        var catBreakdown = catTotals
+            .OrderByDescending(x => x.Amount)
+            .Select(x => new DashboardDto.CategoryBreakdownDto
+            {
+                Name    = (x.CategoryId != Guid.Empty && nameById.TryGetValue(x.CategoryId, out var nm)) ? nm : "Diğer",
+                Amount  = x.Amount,
+                Percent = totalCatAmount > 0 ? (int)Math.Round(x.Amount * 100m / totalCatAmount) : 0
+            })
+            .ToList();
+
         // ---- Series for the summary chart ----
         var weekLabels     = weeklyList.Select(w => w.WeekLabel).ToList();
         var actualSeries   = weeklyList.Select(w => w.Actual).ToList();
@@ -172,7 +195,8 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
             ActualSeries       = actualSeries,
             InvoicedSeries     = invoicedSeries,
             WorkedHoursSeries  = weeklyList.Select(w => w.WorkedHours).ToList(),
-            WeeklyDataByProject = weeklyByProject
+            WeeklyDataByProject = weeklyByProject,
+            CategoryBreakdown   = catBreakdown,
         };
     }
 }
