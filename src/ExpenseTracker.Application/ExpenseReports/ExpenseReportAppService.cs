@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 using ExpenseTracker.ExpenseReports;
 using ExpenseTracker.ExpenseReports.Services;
 using ExpenseTracker.Projects;
+using ExpenseTracker.Permissions;
+using Microsoft.AspNetCore.Authorization;
+using Volo.Abp.Authorization;
 using Microsoft.Extensions.Logging;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
@@ -13,6 +16,7 @@ using Volo.Abp.MultiTenancy;
 
 namespace ExpenseTracker.ExpenseReports.Services
 {
+    [Authorize(ExpenseTrackerPermissions.ExpenseReports.Default)]
     public class ExpenseReportAppService : ApplicationService, IExpenseReportAppService
     {
         private readonly IExpenseReportRepository _expenseReportRepository;
@@ -49,14 +53,14 @@ namespace ExpenseTracker.ExpenseReports.Services
             await _categoryRepository.InsertAsync(created, autoSave: true);
             return created.Id;
         }
+        [Authorize(ExpenseTrackerPermissions.ExpenseReports.Create)]
         public async Task<ExpenseReportDto> CreateAsync(CreateExpenseReportDto input)
         {
             var expenseReport = new ExpenseReport(
                 projectId: input.ProjectId,
                 spendingLimit: input.SpendingLimit,
                 createdAt: DateTime.Now,
-                receiptFilePath: input.ReceiptFilePath,
-                creatorId: CurrentUser.Id
+                receiptFilePath: input.ReceiptFilePath
             )
             {
                 Title = input.Title,
@@ -111,14 +115,37 @@ namespace ExpenseTracker.ExpenseReports.Services
             return ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(expenseReport);
         }
 
+        [Authorize(ExpenseTrackerPermissions.ExpenseReports.Delete)]
         public async Task DeleteAsync(Guid id)
         {
             await _expenseReportRepository.DeleteAsync(id);
         }
 
+        public async Task<List<ExpenseReportDto>> GetListAsync()
+        {
+            Logger.LogInformation("[ExpenseReport] UI GetListAsync() called (parametresiz).");
+            return await GetListAsync(
+                projectId: null,
+                status: null,
+                dateFrom: null,
+                dateTo: null,
+                categoryId: null,
+                search: null
+            );
+        }
+
+        [Authorize(ExpenseTrackerPermissions.ExpenseReports.Default)]
         public async Task<ExpenseReportDto> GetAsync(Guid id)
         {
             var entity = await _expenseReportRepository.GetAsync(id);
+            // Permission/ownership check: allow all if user has ViewAll; otherwise only owner can view
+            if (!await AuthorizationService.IsGrantedAsync(ExpenseTrackerPermissions.ExpenseReports.ViewAll))
+            {
+                if (entity.OwnerId != CurrentUser.Id)
+                {
+                    throw new AbpAuthorizationException("You are not allowed to view this expense report.");
+                }
+            }
             var dto = ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(entity);
 
             // Proje adını doldur
@@ -155,12 +182,71 @@ namespace ExpenseTracker.ExpenseReports.Services
             return dto;
         }
 
-        public async Task<List<ExpenseReportDto>> GetListAsync()
+        [Authorize(ExpenseTrackerPermissions.ExpenseReports.Default)]
+        public async Task<List<ExpenseReportDto>> GetListAsync(
+            Guid? projectId = null,
+            string? status = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null,
+            Guid? categoryId = null,
+            string? search = null)
         {
             Logger.LogInformation("[ExpenseReport] GetList called. CurrentTenant={TenantId}, CurrentUser={UserId}", CurrentTenant?.Id, CurrentUser?.Id);
+
             var reports = await _expenseReportRepository.GetListAsync();
-            Logger.LogInformation("[ExpenseReport] GetList returned {Count} rows", reports?.Count ?? -1);
-            return reports.Select(r => ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(r)).ToList();
+
+            // If the user does NOT have ViewAll permission, restrict to own reports
+            if (!await AuthorizationService.IsGrantedAsync(ExpenseTrackerPermissions.ExpenseReports.ViewAll))
+            {
+                var currentUserId = CurrentUser.Id;
+                reports = reports.Where(r => r.OwnerId == currentUserId).ToList();
+            }
+
+            // ---- In-memory filtering (post-repository) ----
+            IEnumerable<ExpenseReport> query = reports;
+
+            if (projectId.HasValue && projectId.Value != Guid.Empty)
+            {
+                query = query.Where(r => r.ProjectId == projectId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                var st = status.Trim();
+                query = query.Where(r => string.Equals(r.Status, st, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (dateFrom.HasValue)
+            {
+                query = query.Where(r => r.CreatedAt >= dateFrom.Value);
+            }
+
+            if (dateTo.HasValue)
+            {
+                query = query.Where(r => r.CreatedAt <= dateTo.Value);
+            }
+
+            if (categoryId.HasValue && categoryId.Value != Guid.Empty)
+            {
+                query = query.Where(r => r.Items != null && r.Items.Any(i => i.CategoryId == categoryId.Value));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                query = query.Where(r =>
+                    (!string.IsNullOrWhiteSpace(r.Title) && r.Title.Contains(s, StringComparison.OrdinalIgnoreCase))
+                    || (r.Items != null && r.Items.Any(i =>
+                           (!string.IsNullOrWhiteSpace(i.Description) && i.Description.Contains(s, StringComparison.OrdinalIgnoreCase))
+                           || (!string.IsNullOrWhiteSpace(i.Name) && i.Name.Contains(s, StringComparison.OrdinalIgnoreCase))
+                       ))
+                );
+            }
+
+            var filtered = query.ToList();
+
+            Logger.LogInformation("[ExpenseReport] GetList filtered. Total={Total}, AfterFilter={After}", reports?.Count ?? -1, filtered.Count);
+            return filtered.Select(r => ObjectMapper.Map<ExpenseReport, ExpenseReportDto>(r)).ToList();
         }
     }
 }

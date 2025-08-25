@@ -10,15 +10,20 @@ namespace ExpenseTracker.ExpenseReports
         public ExpenseReport() { }
 
         // Domain-friendly ctor (Id ABP tarafından yönetilir; Id parametresi YOK)
-        public ExpenseReport(Guid projectId, decimal spendingLimit, DateTime createdAt, string? receiptFilePath, Guid? creatorId)
+        public ExpenseReport(Guid projectId, decimal spendingLimit, DateTime createdAt, string? receiptFilePath, Guid ownerId)
         {
             ProjectId = projectId;
             SpendingLimit = spendingLimit;
             CreatedAt = createdAt;
             ReceiptFilePath = receiptFilePath;
-            CreatorId = creatorId; // FullAuditedAggregateRoot'tan gelir
+            OwnerId = ownerId;
             Status = "Pending";
             Title = string.Empty;
+        }
+
+        public ExpenseReport(Guid projectId, decimal spendingLimit, DateTime createdAt, string? receiptFilePath)
+        {
+            throw new NotImplementedException();
         }
 
         public string Title { get; set; } = string.Empty;

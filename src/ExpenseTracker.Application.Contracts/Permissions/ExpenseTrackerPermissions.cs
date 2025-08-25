@@ -3,7 +3,19 @@
 public static class ExpenseTrackerPermissions
 {
     public const string GroupName = "ExpenseTracker";
-    public const string MyPermission1 = "MyPermission1";
-    //Add your own permission names. Example:
-    //public const string MyPermission1 = GroupName + ".MyPermission1";
+
+    public static class ExpenseReports
+    {
+        public const string Default = GroupName + ".ExpenseReports";   // Görüntüleme/Listeleme (kendi kayıtları)
+        public const string Create  = Default + ".Create";             // Oluşturma
+        public const string Delete  = Default + ".Delete";             // Silme (kendi kaydı)
+        public const string ViewAll = Default + ".ViewAll";            // Tüm kayıtları görme (admin/manager)
+        public const string Approve = Default + ".Approve";            // Onay/Red verme
+    }
+
+    public static class Dashboard
+    {
+        public const string Default = GroupName + ".Dashboard";
+        public const string ViewAll = Default + ".ViewAll";
+    }
 }

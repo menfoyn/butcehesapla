@@ -5,11 +5,15 @@ using System.Linq;
 using System.Threading.Tasks;
 using ExpenseTracker.ExpenseReports;
 using ExpenseTracker.Projects; // <— for Project repo
+using Microsoft.AspNetCore.Authorization;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Users;
+using ExpenseTracker.Permissions;
 
 namespace ExpenseTracker.Dashboard;
 
+[Authorize(ExpenseTrackerPermissions.Dashboard.Default)]
 public class DashboardAppService : ApplicationService, IDashboardAppService
 {
     private readonly IRepository<ExpenseReport, Guid> _reportRepo;
@@ -31,9 +35,39 @@ public class DashboardAppService : ApplicationService, IDashboardAppService
 
     public async Task<DashboardDto> GetDashboardDataAsync()
     {
+        return await GetDashboardDataAsync(null, null, null);
+    }
+
+    public async Task<DashboardDto> GetDashboardDataAsync(Guid? projectId, DateTime? dateFrom, DateTime? dateTo)
+    {
         var reportQ  = await _reportRepo.GetQueryableAsync();
         var itemQ    = await _itemRepo.GetQueryableAsync();
         var projQ    = await _projectRepo.GetQueryableAsync();
+
+        // Authorization-based filtering: non-admins see only their own reports
+        var canViewAll = await AuthorizationService.IsGrantedAsync(ExpenseTrackerPermissions.Dashboard.ViewAll);
+        if (!canViewAll)
+        {
+            var currentUserId = CurrentUser.GetId();
+            reportQ = reportQ.Where(r => r.OwnerId == currentUserId);
+        }
+
+        // Apply explicit filters if provided
+        if (projectId.HasValue && projectId.Value != Guid.Empty)
+        {
+            reportQ = reportQ.Where(r => r.ProjectId == projectId.Value);
+        }
+        if (dateFrom.HasValue)
+        {
+            var from = dateFrom.Value.Date;
+            itemQ = itemQ.Where(i => i.Date >= from);
+        }
+        if (dateTo.HasValue)
+        {
+            // make `to` inclusive for the whole day
+            var toExclusive = dateTo.Value.Date.AddDays(1);
+            itemQ = itemQ.Where(i => i.Date < toExclusive);
+        }
 
         // LEFT JOIN projects to pick the real project name if available
         var projectedQuery =

@@ -1,28 +1,30 @@
-﻿using Volo.Abp.Account;
-using Volo.Abp.FeatureManagement;
-using Volo.Abp.Identity;
-using Volo.Abp.Modularity;
-using Volo.Abp.ObjectExtending;
-using Volo.Abp.PermissionManagement;
-using Volo.Abp.SettingManagement;
-using Volo.Abp.TenantManagement;
+﻿using Volo.Abp.Modularity;
+using Volo.Abp.Localization;
+using Volo.Abp.Localization.ExceptionHandling;
+using Volo.Abp.Validation.Localization;
+using Volo.Abp.VirtualFileSystem;
+using Volo.Abp.Authorization.Permissions;
+using ExpenseTracker.Permissions;
+using Volo.Abp.Authorization;
 
 namespace ExpenseTracker;
 
 [DependsOn(
     typeof(ExpenseTrackerDomainSharedModule),
-    typeof(AbpAccountApplicationContractsModule),
-    typeof(AbpFeatureManagementApplicationContractsModule),
-    typeof(AbpIdentityApplicationContractsModule),
-    typeof(AbpPermissionManagementApplicationContractsModule),
-    typeof(AbpSettingManagementApplicationContractsModule),
-    typeof(AbpTenantManagementApplicationContractsModule),
-    typeof(AbpObjectExtendingModule)
+    typeof(AbpAuthorizationModule)
 )]
 public class ExpenseTrackerApplicationContractsModule : AbpModule
 {
     public override void PreConfigureServices(ServiceConfigurationContext context)
     {
         ExpenseTrackerDtoExtensions.Configure();
+    }
+
+    public override void ConfigureServices(ServiceConfigurationContext context)
+    {
+        Configure<AbpPermissionOptions>(options =>
+        {
+            options.DefinitionProviders.Add<ExpenseTrackerPermissionDefinitionProvider>();
+        });
     }
 }
