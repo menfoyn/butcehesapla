@@ -28,6 +28,11 @@ public class DashboardDto
     // fill this dictionary: key = ProjectId, value = weekly points for that project
     public Dictionary<Guid, List<WeeklyChartDataDto>> WeeklyDataByProject { get; set; } = new();
     public List<WeeklyChartDataDto> WeeklyData { get; set; } = new();
+    public List<CategoryBreakdownDto> CategoryBreakdown { get; set; } = new();    public class CategoryBreakdownDto {
+        public string Name { get; set; }
+        public decimal Amount { get; set; }
+        public int Percent { get; set; } // 0-100
+    }
 }
 
 public class ProjectSummaryDto

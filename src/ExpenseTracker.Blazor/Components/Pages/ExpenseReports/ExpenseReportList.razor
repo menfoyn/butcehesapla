@@ -38,7 +38,7 @@ else
         <table class="table align-middle">
             <thead class="table-light">
                 <tr>
-                    <th style="min-width: 280px;">Kategori / Proje / Başlık</th>
+                    <th style="min-width: 280px;">Proje / Kategori / Başlık</th>
                     <th style="width: 140px;" class="text-end">Toplam</th>
                     <th style="width: 120px;">Durum</th>
                     <th style="width: 160px;" class="text-end">İşlemler</th>
@@ -49,7 +49,7 @@ else
             {
                 <tr>
                     <td>
-                        <div class="fw-semibold">@DisplayProject(report)</div>
+                        <div class="project-name">@DisplayProject(report)</div>
                         @if (_categoriesById.TryGetValue(report.Id, out var cats) && cats.Any())
                         {
                             <div class="mt-1">
@@ -96,6 +96,26 @@ else
 .table tbody tr { transition:background .15s ease, transform .05s ease; }
 .table tbody tr:hover { background:#fafbfc; }
 .table .badge { font-weight:600; border:1px solid rgba(0,0,0,.08); }
+
+.project-name {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: .3px;
+  color: #2c3e50;
+  text-transform: uppercase;
+  border-bottom: 1px solid #eaeaea;
+  padding-bottom: 2px;
+  margin-bottom: 4px;
+}
+
+.table .badge {
+  background: #f0f2f5;
+  border-radius: 12px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #34495e;
+}
 
 /* Status pill palette */
 .badge.bg-success { background: #e6f4ea!important; color:#157347; border-color:#cce9d5!important; }
@@ -209,28 +229,32 @@ else
                 // Detay çağrısı: Items ve ProjectName kesin gelir
                 var full = await ExpenseReportAppService.GetAsync(r.Id);
 
-                // Kategori ismi (ilk kategori) ya da Proje adı
+                // ÖNCE Proje adı (tercih), yoksa ilk kategori adı
                 var firstCategory = full?.Items?.FirstOrDefault(i => !string.IsNullOrWhiteSpace(i?.Category))?.Category;
                 string? name = null;
 
-                if (!string.IsNullOrWhiteSpace(firstCategory))
-                {
-                    name = firstCategory!.ToUpperInvariant();
-                }
-                else if (!string.IsNullOrWhiteSpace(full?.ProjectName))
+                // 1) ProjectName (detay DTO'dan)
+                if (!string.IsNullOrWhiteSpace(full?.ProjectName))
                 {
                     name = full!.ProjectName!.ToUpperInvariant();
                 }
+                // 2) ProjectName (liste DTO'sundan)
                 else if (!string.IsNullOrWhiteSpace(r?.ProjectName))
                 {
                     name = r!.ProjectName!.ToUpperInvariant();
                 }
-                if (string.IsNullOrWhiteSpace(name) && r.ProjectId != Guid.Empty && _projectNameById.TryGetValue(r.ProjectId, out var pn) && !string.IsNullOrWhiteSpace(pn))
+                // 3) ProjectId üzerinden önceden yüklenmiş project cache'i
+                else if (r != null && r.ProjectId != Guid.Empty && _projectNameById.TryGetValue(r.ProjectId, out var pn) && !string.IsNullOrWhiteSpace(pn))
                 {
-                    name = pn;
+                    name = pn.ToUpperInvariant();
+                }
+                // 4) Fallback: ilk kategori adı
+                else if (!string.IsNullOrWhiteSpace(firstCategory))
+                {
+                    name = firstCategory!.ToUpperInvariant();
                 }
 
-                _displayNameById[r.Id] = name ?? "(KATEGORİ / PROJE YOK)";
+                _displayNameById[r.Id] = string.IsNullOrWhiteSpace(name) ? "(PROJE YOK)" : name;
 
                 // Distinct kategori rozetleri
                 var cats = full?.Items?
@@ -243,7 +267,7 @@ else
             }
             catch
             {
-                _displayNameById[r.Id] = "(KATEGORİ / PROJE YOK)";
+                _displayNameById[r.Id] = "(PROJE YOK)";
                 _categoriesById[r.Id] = new List<string>();
             }
         }
@@ -269,24 +293,26 @@ else
     // --- UI helpers ---
     private string DisplayProject(ExpenseReportDto r)
     {
-        // Önce cache
-        if (r != null && _displayNameById.TryGetValue(r.Id, out var cached) && !string.IsNullOrWhiteSpace(cached))
-            return cached;
+        {
+            // Önce cache
+            if (r != null && _displayNameById.TryGetValue(r.Id, out var cached) && !string.IsNullOrWhiteSpace(cached))
+                return cached;
 
-        // Hızlı fallback: liste DTO'sunda proje varsa
-        if (!string.IsNullOrWhiteSpace(r?.ProjectName))
-            return r!.ProjectName!.ToUpperInvariant();
+            // 1) Proje adı doğrudan DTO'da varsa
+            if (!string.IsNullOrWhiteSpace(r?.ProjectName))
+                return r!.ProjectName!.ToUpperInvariant();
 
-        // Fallback: resolve by ProjectId via cached project list
-        if (r != null && r.ProjectId != Guid.Empty && _projectNameById.TryGetValue(r.ProjectId, out var pname) && !string.IsNullOrWhiteSpace(pname))
-            return pname.ToUpperInvariant();
+            // 2) ProjectId -> önceden yüklenmiş proje adı
+            if (r != null && r.ProjectId != Guid.Empty && _projectNameById.TryGetValue(r.ProjectId, out var pname) && !string.IsNullOrWhiteSpace(pname))
+                return pname.ToUpperInvariant();
 
-        // Hızlı fallback: liste DTO'sunda item ve kategori varsa
-        var category = r?.Items?.FirstOrDefault()?.Category;
-        if (!string.IsNullOrWhiteSpace(category))
-            return category!.ToUpperInvariant();
+            // 3) Fallback: ilk kategori adı
+            var category = r?.Items?.FirstOrDefault()?.Category;
+            if (!string.IsNullOrWhiteSpace(category))
+                return category!.ToUpperInvariant();
 
-        return "(KATEGORİ / PROJE YOK)";
+            return "(PROJE YOK)";
+        }
     }
 
     private static string StatusBadge(string? status)
